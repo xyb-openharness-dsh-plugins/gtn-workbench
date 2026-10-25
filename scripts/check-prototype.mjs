@@ -141,6 +141,33 @@ check('nutrition-mind-data',
   (data.match(/d: '\d{4}-\d{2}-\d{2}', state:/g) || []).length >= 5 &&
   /waitDays/.test(data) && /口腔溃疡/.test(data) && /仅本机/.test(app), {});
 check('oneshow-chart', /function oneshowChart/.test(app) && /清宫/.test(app) && /达正常锚点（你勾选）/.test(app), {});
+/* ---------- v0.4.0 新增：临床研究三档匹配表达约束（MATCHING-SPEC §4.4） ---------- */
+check('match-three-tiers',
+  /已满足/.test(app) && /可能冲突/.test(app) && /无法判定/.test(app) && /待确认规则/.test(app)
+  && /satisfied/.test(data) && /conflict/.test(data) && /undetermined/.test(data), {});
+check('match-summary-line', /已满足 \$\{/.test(app) && /待确认规则 \$\{e\.pending\.length\} 项/.test(app)
+  && /汇总只计数，不给匹配度/.test(app), {});
+check('match-footer-sentence', app.includes('三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心')
+  && data.includes('三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心'), {});
+/* 禁：匹配度百分比 / 高匹配 / 推荐试验（app + demo 自写文案与 HTML；recordId 行豁免同上） */
+check('match-no-percent', !/匹配度\s*[%％]|\d+\s*%.*匹配|percent/.test(app) && !/匹配度\s*[%％]/.test(dataExExcerpt) && !/高匹配/.test(app) && !/高匹配/.test(dataExExcerpt), {});
+check('match-no-recommend', !/推荐/.test(app) && !/推荐/.test(dataExExcerpt) && !/推荐/.test(html), {});
+/* 排序按数据来源顺序：demo 的 match.entries 顺序必须与 trials items 顺序一致（不按匹配度排） */
+const matchBlock = (data.split('match: {')[1] || '').split('/* 指标分类')[0];
+const matchOrder = [...matchBlock.matchAll(/recordId: '(CTR\d+)'/g)].map((m) => m[1]);
+const itemsBlock = (data.split('trials: {')[1] || '').split('/* 临床研究匹配')[0];
+const trialsOrderReal = [...itemsBlock.matchAll(/recordId: '(CTR\d+)'/g)].map((m) => m[1]);
+check('match-source-order', matchOrder.length === 6 && JSON.stringify(matchOrder) === JSON.stringify(trialsOrderReal), { matchOrder, trialsOrder: trialsOrderReal });
+/* 档案完整度 + 缺失→无法判定 不阻断 */
+check('match-profile-completeness', /完整度 \$\{fields\.length - missing\.length\}\/\$\{fields\.length\}/.test(app)
+  && /缺失不阻断匹配/.test(app) && /对应条件将判「无法判定」/.test(app), {});
+/* 检索双通道 + AI 只起草不代发 + 外部通道如实声明 */
+check('match-dual-channel', /检索双通道/.test(app) && /自带库检索/.test(app) && /AI 协助匹配/.test(app)
+  && /fetch-gtn-trials-2026/.test(app) && /unified-trial-mcp/.test(app) && /终端态如实/.test(app), {});
+/* demo 三档都齐：至少 1 条可能冲突 + 至少 2 条无法判定 + 至少 1 条待确认 */
+const tierCount = (t) => (data.match(new RegExp(`tier: '${t}'`, 'g')) || []).length;
+check('match-demo-tier-mix', tierCount('conflict') >= 1 && tierCount('undetermined') >= 2 && tierCount('satisfied') >= 6
+  && /试验期间需采取避孕措施（登记原文未结构化，待确认）/.test(data), { conflict: tierCount('conflict'), undetermined: tierCount('undetermined'), satisfied: tierCount('satisfied') });
 
 const failed = results.filter((r) => !r.ok);
 const summary = { ok: failed.length === 0, total: results.length, failed: failed.length, checks: results, at: new Date().toISOString() };

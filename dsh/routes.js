@@ -80,6 +80,23 @@ export function createApiHandler({ source, version, build, serveUi, workspace = 
       }
     }
 
+    /* 临床研究匹配：最近一次评估（三档 + 待确认规则）。只读，评估由确定性规则求值生成。 */
+    if (path === `${API_PREFIX}/trials/match`) {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' })
+      try {
+        const { matchAssessment } = await import('./readmodels.js')
+        return sendJson(res, 200, { data: matchAssessment(source.db) })
+      } catch (error) {
+        const { status, body } = errorBody(error)
+        return sendJson(res, status, body)
+      }
+    }
+    /* 外部检索通道（unified-trial-mcp）预留：开发版不接真实外部工具。
+       接入形态约定（留档，不在本文件实现）：
+         const resp = await fetch(`${TRIAL_MCP_BASE}/search?q=...`)   // unified-trial-mcp 的检索接口
+       约束：外部结果只进候选（未核对不入事实层），来源与抓取时间必须随行落库；
+       检索与匹配是两步，外部通道只提供"有哪些试验"，不参与三档判定。 */
+
     /* 导入：原始字节 + 查询串，走 MinerU；只写候选不写记录（候选未核对不入事实层）。 */
     if (path === `${API_PREFIX}/import`) {
       if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' })

@@ -178,6 +178,42 @@ export function seedDemo(db, input) {
     const insCat = db.prepare('INSERT INTO metric_cats (key, name, latest, count, note, go, go_label, ord) VALUES (?,?,?,?,?,?,?,?)');
     D.metricCats.forEach((c, i) => insCat.run(c.key, c.name, c.latest, c.count, c.note, c.go, c.goLabel, i));
 
+    /* 临床研究匹配（0004）：入排规则 + 一次评估快照。
+       field_key/rule_type/condition 不进 demo-data（那是展示形状），这里按规则文本归类；
+       judgments 按 match_rules.id 关联，保证"同样档案 + 同样规则版本 = 同样结果"。 */
+    const ruleMeta = (text) => {
+      if (text.startsWith('年龄')) return { field: 'age', type: 'age_range', cond: { op: '>=', value: 18, unit: '岁' } };
+      if (text.includes('健康受试者')) return { field: 'disease_status', type: 'disease_type', cond: { op: 'excludes_active_disease', value: true } };
+      if (text.startsWith('排除妊娠期')) return { field: 'pregnancy_gtn_history', type: 'disease_type', cond: { op: 'excludes', value: '妊娠期或滋养细胞疾病' } };
+      if (text.includes('病理确诊')) return { field: 'pathology', type: 'pathology_required', cond: { op: 'pathology_confirms', value: '滋养细胞肿瘤' } };
+      if (text.includes('复发性')) return { field: 'target_population', type: 'other', cond: { note: '登记原文未结构化，保留原文判无法判定' } };
+      if (text.includes('hCG')) return { field: 'pre_treatment_hcg', type: 'lab_threshold', cond: { op: '<', value: 100000, unit: 'IU/L' } };
+      if (text.includes('化疗线数')) return { field: 'chemo_lines', type: 'prior_therapy_count', cond: { op: '<=', value: Number((text.match(/≤\s*(\d+)/) || [])[1] ?? 1) } };
+      if (text.includes('肝功能')) return { field: 'liver_function', type: 'organ_function', cond: { note: '参考范围基准随试验声明；逐项数值未入档时判无法判定' } };
+      if (text.includes('随访')) return { field: 'followup_capacity', type: 'other', cond: { note: 'other 类型规则，保留原文判无法判定' } };
+      return { field: 'unknown', type: 'other', cond: { note: '未分类，按无法判定处理' } };
+    };
+    const insRule = db.prepare(`INSERT INTO match_rules
+      (trial_record_id, rule_text, field_key, rule_type, condition_json, pending, ord)
+      VALUES (?,?,?,?,?,?,?)`);
+    const judgments = {};
+    for (const e of D.match.entries) {
+      let ord = 0;
+      for (const r of e.rules) {
+        const meta = ruleMeta(r.text);
+        const res = insRule.run(e.recordId, r.text, meta.field, meta.type, j(meta.cond), 0, ord++);
+        judgments[String(Number(res.lastInsertRowid))] = { tier: r.tier, mine: r.mine, src: r.src };
+      }
+      for (const p of e.pending) {
+        const meta = ruleMeta(p);
+        insRule.run(e.recordId, p, meta.field, meta.type, j(meta.cond), 1, ord++);
+      }
+    }
+    db.prepare(`INSERT INTO match_assessments
+      (profile_key, profile_revision, rule_set_version, judgments_json, generated_at)
+      VALUES (?,?,?,?,?)`)
+      .run(key, D.match.profileRevision, D.match.ruleSetVersion, j(judgments), D.match.generatedAt);
+
     /* demo_meta：meta 三件 + 随访计划参数 + 营养/心理/研究页文案 */
     const insMeta = db.prepare('INSERT OR REPLACE INTO demo_meta (key, text) VALUES (?,?)');
     for (const [k, v] of Object.entries(D.meta || {})) insMeta.run(k, String(v));
@@ -188,6 +224,8 @@ export function seedDemo(db, input) {
     insMeta.run('mind_quote', D.mind.quote);
     insMeta.run('trials_source_label', D.trials.sourceLabel);
     insMeta.run('trials_disclaimer', D.trials.disclaimer);
+    insMeta.run('match_footer_note', D.match.footerNote);
+    insMeta.run('match_channels_note', D.match.channelsNote);
 
     db.exec('COMMIT');
   } catch (error) {

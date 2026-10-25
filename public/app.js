@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.3.0 — GTN 工作台开发版（M5，由交互原型 v0.2.0 逐字符移植）。
-   视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对）；开发版只换数据来源：
+/* 小葡宝 GraPal v0.4.0 — GTN 工作台开发版（M5，临床研究页按脚手架匹配模式重做）。
+   视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.4）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.3.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.4.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -90,7 +90,7 @@ const SUBTITLES = {
   oneshow: '清宫 → hCG 序列 → 疗程 → 锚点 → 随访，一张图讲完病程。',
   nutrition: '化疗期每餐记录、口腔溃疡期进食影响、体重序列；叶酸只按医嘱记录。',
   mind: '情绪日记、等报告日的焦虑、家人沟通；私密记录仅本机。',
-  trials: '公开登记平台摘录（登记 ≠ 有效 ≠ 可入组），按来源筛选。',
+  trials: '登记摘录 + 入组档案 + 三档匹配（已满足 / 可能冲突 / 无法判定），入组判断属于医生与研究中心。',
   import: '上传报告 → 逐文件授权 → 候选核对 → 入档；拒收零副作用。',
   review: '勾选范围生成一份材料，与档案同源。',
   settings: '资料目录、解析模式与凭据状态、临床参考数据包来源与版本。'
@@ -133,7 +133,8 @@ const state = {
   keypad: null,              // { input, title }
   pin: null,                 // hCG 图选中的点
   flipped: new Set(),        // 已翻转的指标分类卡（key 集合）
-  trialFilter: 'all'         // 临床研究来源筛选：all | chinadrugtrials
+  trialFilter: 'all',        // 临床研究来源筛选：all | chinadrugtrials
+  trialFavs: new Set()       // 匹配结果卡收藏（record_id 集合，仅本机态）
 };
 let uidSeq = 0;
 const uid = (p) => p + (++uidSeq);
@@ -681,9 +682,62 @@ function vMind() {
   ${quoteLine(QUOTE.none)}`;
 }
 
-/* ---------------- 临床研究（登记摘录） ---------------- */
+/* ---------------- 临床研究（登记摘录 + 三档匹配，MATCHING-SPEC §4） ---------------- */
+/* 入组档案（GTN 版）：全部来自既有病情数据，本页只读不录；缺失字段 → 对应规则「无法判定」，不阻断。 */
+function matchProfileFields() {
+  const first = D.hcg.points[0];
+  const ct = D.pathology.find((x) => !x.src.includes('病理'));
+  return [
+    { k: '年龄', v: `${D.patient.age} 岁`, src: '患者档案' },
+    { k: '末次妊娠类型', v: D.pregnancy.type, src: '末次妊娠档案' },
+    { k: '治疗前血 hCG', v: `${first.v} ${D.hcg.unit}（${first.d}，序列首点）`, src: 'hCG 时间线' },
+    { k: 'FIGO 评分八项原始分', v: `已照抄（总分自动求和 ${figoTotal()}，不代表分级建议）`, src: 'FIGO 自录表' },
+    { k: '分期原文', v: '无单独分期原文记录（FIGO/WHO 2000 评分自录，见诊断档案）', src: '诊断档案' },
+    { k: '化疗线数与方案', v: `1 线 · ${D.cycles[0].regimen} × ${D.cycles.length} 疗（${D.cycles[0].start} → ${D.cycles[D.cycles.length - 1].end}）`, src: '治疗记录' },
+    { k: '血常规最近值', v: D.cycles[D.cycles.length - 1].fields['复查血象'] || null, src: '疗程卡' },
+    { k: '肝肾功能最近值', v: null, src: '资料档案（有报告摘录，逐项数值未入档）' },
+    { k: '转移部位记录', v: ct ? `肺（${ct.src}：结节约 0.8 cm，转移待排——原文摘录）` : null, src: '病理/影像摘录' },
+    { k: '规律随访安排', v: null, src: '（无对应记录）' }
+  ];
+}
+
+/* 三档固定文案（中性色，不用红绿给试验排名；顺序固定：可能冲突 → 无法判定 → 已满足）。 */
+const TIER_LABEL = { conflict: '可能冲突', undetermined: '无法判定', satisfied: '已满足' };
+const TIER_MARK = { conflict: '⚠️', undetermined: '❓', satisfied: '✅' };
+
+/* AI 协助匹配的预写提示词（gtn:agent-draft 契约：只放进输入框，不自动发送）。 */
+function matchPrompt() {
+  const fields = matchProfileFields();
+  const summary = fields.map((f) => `${f.k}：${f.v || '未记录'}`).join('；');
+  const ids = D.trials.items.map((i) => i.recordId).join(' / ');
+  return `请协助我把入组档案与 ${D.trials.items.length} 条登记研究逐条比对。档案摘要——${summary}。试验列表——${ids}。要求：只用「已满足 / 可能冲突 / 无法判定」三档逐条列出，每条写清「你的记录」与来源；缺失字段一律判「无法判定」；不输出匹配度百分比、不排序、不写哪条更适合我；三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心。`;
+}
+
+/* 单条试验的匹配结果卡：汇总行只计数；分组每条含「你的记录」与来源；卡脚固定句。 */
+function matchResultCard(e) {
+  const item = D.trials.items.find((t) => t.recordId === e.recordId);
+  const by = { conflict: [], undetermined: [], satisfied: [] };
+  for (const r of e.rules) if (by[r.tier]) by[r.tier].push(r);
+  const group = (t) => by[t].length
+    ? `<div class="subhead">${TIER_MARK[t]} ${TIER_LABEL[t]}</div>` + by[t].map((r) =>
+      `<div class="row"><div class="row-main"><div><b>${esc(r.text)}</b><p>你的记录：${esc(r.mine)} · 来源：${esc(r.src)}</p></div></div></div>`).join('')
+    : '';
+  const fav = state.trialFavs.has(e.recordId);
+  return `<div class="cand">
+    <div class="cand-head"><b>${esc(item ? item.title : e.recordId)}</b>
+      <div class="head-actions"><button class="chip${fav ? ' on' : ''}" data-action="trial-fav" data-arg="${esc(e.recordId)}" aria-pressed="${fav}">☆ 收藏</button></div></div>
+    <p class="muted">已满足 ${by.satisfied.length} 项 · 可能冲突 ${by.conflict.length} 项 · 无法判定 ${by.undetermined.length} 项 · 待确认规则 ${e.pending.length} 项（汇总只计数，不给匹配度）</p>
+    ${group('conflict')}${group('undetermined')}${group('satisfied')}
+    ${e.pending.length ? `<div class="subhead">⏳ 待确认规则（不进三档统计）</div>${e.pending.map((p) => `<div class="row"><div class="row-main"><div><b>${esc(p)}</b></div></div></div>`).join('')}` : ''}
+    <p class="muted small">${esc(D.match.footerNote)}</p>
+    <p class="muted small">登记号 ${esc(e.recordId)} · 排序按数据来源顺序，不按匹配度 · 评估生成 ${esc(D.match.generatedAt)}（档案 ${esc(D.match.profileRevision)} · 规则集 ${esc(D.match.ruleSetVersion)}）</p>
+  </div>`;
+}
+
 function vTrials() {
   const t = D.trials;
+  const fields = matchProfileFields();
+  const missing = fields.filter((f) => !f.v);
   const filters = [
     ['all', `全部来源（${t.items.length}）`],
     ['chinadrugtrials', '中国药物临床试验登记平台'],
@@ -694,7 +748,17 @@ function vTrials() {
     : [];
   return `${pageHead('trials')}
   <div class="notice">${esc(t.disclaimer)}</div>
-  <div class="card"><div class="card-head"><h2>登记研究（${t.items.length} 条摘录）</h2><span class="muted">快照 2026-10-25 · ${esc(t.sourceLabel)}</span></div>
+  <div class="card"><div class="card-head"><h2>入组档案（不重复录入）</h2><span class="muted">完整度 ${fields.length - missing.length}/${fields.length} · 全部来自既有病情数据</span></div>
+    <div class="notice">缺失不阻断匹配，但对应条件会判「无法判定」${missing.length ? '，当前缺失：' + missing.map((f) => esc(f.k)).join(' · ') : ''}。</div>
+    <div class="rows">${fields.map((f) => row(esc(f.k), f.v ? `${esc(f.v)} · 来源：${esc(f.src)}` : '<b>未记录</b>——对应条件将判「无法判定」')).join('')}</div>
+    <p class="muted small">年龄 / 末次妊娠 / FIGO 八项 / 化疗方案等已在诊断与治疗页维护，这里只读不录；补充字段请回对应业务页录入。</p>
+  </div>
+  <div class="card"><div class="card-head"><h2>检索双通道</h2><span class="muted">自带库 6 条 · AI 协助只起草不代发</span></div>
+    <div class="rows">
+      ${row('① 自带库检索', `${esc(t.sourceLabel)} · 快照 2026-10-25 · ${t.items.length} 条登记摘录（下方按来源筛选）`)}
+      ${row('② AI 协助匹配', '把档案摘要与试验列表预写进提示词（gtn:agent-draft 契约：只填充输入框，不自动发送）', `<button class="text-button" data-action="agent-draft" data-prompt="${esc(matchPrompt())}">AI 协助匹配</button>`)}
+      ${row('外部检索通道', '脚本 fetch-gtn-trials-2026（终端态如实：需在终端手动运行，本页不代跑）· unified-trial-mcp（开发版未接入）', pill('未接入', 'yellow'))}
+    </div>
     <div class="chip-row" role="group" aria-label="按来源筛选">${filters.map(([k, l]) =>
       `<button class="chip${state.trialFilter === k ? ' on' : ''}" data-action="trial-filter" data-arg="${k}" aria-pressed="${state.trialFilter === k}">${l}</button>`).join('')}</div>
     ${list.length ? list.map(i => `<div class="cand">
@@ -707,7 +771,12 @@ function vTrials() {
       <p class="muted small">登记 ≠ 有效 ≠ 可入组；详情与参与条件请以登记平台原文及研究方答复为准：${esc(i.url)}</p>
     </div>`).join('') : emptyBox('没有匹配的登记条目', '换一个来源筛选试试；「其它来源」在当前快照里为空，如实显示空态。')}
   </div>
-  ${agentPane('请帮我把这 6 条登记摘录整理成一张表（登记号 / 题目 / 状态），我在门诊时逐条问医生哪些值得进一步核实；不要替我判断哪条适合我。')}
+  <div class="card"><div class="card-head"><h2>匹配结果（三档 · 固定格式）</h2><span class="muted">确定性规则求值 · 排序按数据来源顺序</span></div>
+    <div class="notice">每张卡按「已满足 / 可能冲突 / 无法判定 / 待确认规则」计数并列出每条的「你的记录」与来源；不输出匹配度百分比、不排序、不代为挑选试验。${esc(D.match.channelsNote)}</div>
+    <div class="rows">${D.match.entries.map(matchResultCard).join('')}</div>
+    <p class="muted small">${esc(D.match.footerNote)}</p>
+  </div>
+  ${agentPane(matchPrompt())}
   ${quoteLine(QUOTE.none)}`;
 }
 
@@ -1006,6 +1075,12 @@ const actions = {
   },
   /* 临床研究 */
   'trial-filter'(el) { state.trialFilter = el.dataset.arg; render(); },
+  'trial-fav'(el) {
+    const id = el.dataset.arg;
+    if (state.trialFavs.has(id)) state.trialFavs.delete(id);
+    else state.trialFavs.add(id);
+    render(); toast(state.trialFavs.has(id) ? '已加入收藏（仅本机演示态，登记详情以平台原文为准）。' : '已取消收藏。');
+  },
   /* 键盘 */
   key(el) { keypadKey(el.dataset.k); },
   'key-ok'() { if (state.keypad && state.keypad.input) state.keypad.input.value = $('#keypad-screen').value; closeDialog(); },

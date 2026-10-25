@@ -129,3 +129,35 @@ test('⑦ 资料目录校验：主目录/桌面/下载根/tmp 拒绝，不静默
   assert.ok(validateWorkspacePath('').length > 0, '空目录必须拒');
   assert.deepEqual(validateWorkspacePath(join(tmp, 'ok-dir')), [], '普通子目录可用');
 });
+
+test('⑧ /api/gtn/trials/match 返回三档评估（无百分比、无排序依据）', async () => {
+  await withServer(async ({ url }) => {
+    const r = await fetch(`${url}api/gtn/trials/match`);
+    assert.equal(r.status, 200);
+    const j = await r.json();
+    assert.ok(j.data && Array.isArray(j.data.entries), '评估必须带 entries');
+    assert.equal(j.data.entries.length, 6, '6 条登记各一张结果卡');
+    const tiers = new Set();
+    let pending = 0, rules = 0;
+    for (const e of j.data.entries) {
+      assert.ok(e.recordId);
+      for (const rule of e.rules) {
+        tiers.add(rule.tier);
+        assert.ok(['satisfied', 'conflict', 'undetermined'].includes(rule.tier), `tier 枚举只许三档：${rule.tier}`);
+        assert.ok(rule.mine !== null && rule.src !== null, '每条判定必须带「你的记录」与来源');
+        rules++;
+      }
+      pending += e.pending.length;
+    }
+    assert.ok(tiers.has('conflict') && tiers.has('undetermined') && tiers.has('satisfied'), '演示三档都要出现');
+    assert.ok(rules >= 6 * 3, '每条试验至少 3 条已确认规则');
+    assert.ok(pending >= 1, '待确认规则单列');
+    /* 排序按数据来源顺序：与登记摘录列表的 recordId 顺序一致 */
+    const listOrder = (await (await fetch(`${url}api/gtn/bootstrap`)).json()).data.trials.items.map((t) => t.recordId);
+    assert.deepEqual(j.data.entries.map((e) => e.recordId), listOrder, '排序按数据来源顺序，不按匹配度');
+    /* 表达约束：响应里不许出现匹配度百分比 / 高匹配 / 推荐字样 */
+    const raw = JSON.stringify(j);
+    assert.equal(/匹配度\s*[%％]|高匹配|推荐/.test(raw), false, '评估响应禁百分比/高匹配/推荐');
+    assert.ok(j.data.footerNote.includes('入组判断属于医生与研究中心'), '卡脚固定句必须随评估下发');
+  });
+});

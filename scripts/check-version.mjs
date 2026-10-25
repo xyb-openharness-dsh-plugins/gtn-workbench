@@ -9,8 +9,8 @@
  * 1. **随 VERSION 走**：开发版页面（`public/`）、`lib/version.js`（生成物）、`package.json`、
  *    （若存在）DSH 工作台清单；
  * 2. **冻结在快照版本**：`prototypes/v0.2/` 是 G1/G2 签认过的视觉基准，改动它会破坏
- *    "UI 以 v0.3.0 原型为准"这条依据（D37），所以它不跟着 VERSION 前移，
- *    而是固定核对到 FROZEN_PROTOTYPE 上。
+ *    "UI 以签认原型为准"这条依据（D37），所以它不跟着 VERSION 前移，
+ *    而是固定核对到各自签认号上。
  *
  * 用法：node scripts/check-version.mjs
  * 退出码：0 全部一致；1 有不一致或读不到。
@@ -25,7 +25,7 @@ const read = (p) => readFileSync(join(root, p), 'utf8')
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 
 /** 原型快照的版本：G1/G2 签认时的那个号，不再移动（D37）。 */
-const FROZEN_PROTOTYPE = '0.2.0'
+
 
 const problems = []
 const checks = []
@@ -47,14 +47,16 @@ if (!SEMVER.test(version)) {
   process.exit(1)
 }
 
-/* 0) 冻结快照：原型不跟着版本走，只核对它没被改过号 */
-if (existsSync(join(root, 'prototypes/v0.2/app.js'))) {
-  const appJs = read('prototypes/v0.2/app.js')
-  check('prototypes/v0.2/app.js（快照冻结）', appJs.match(/version:\s*'([^']+)'/)?.[1], FROZEN_PROTOTYPE)
-  const html = read('prototypes/v0.2/index.html')
-  check('prototypes/v0.2/index.html（快照冻结）', html.match(/<title>[^<]*?v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)<\/title>/)?.[1], FROZEN_PROTOTYPE)
+/* 0) 冻结快照：原型不跟着版本走，只核对它没被改过号。
+   v0.2 = 十二页初版（0.2.0）；v0.4 = 临床研究匹配重做版（0.4.0），都冻结在签认号上。 */
+for (const [dir, frozen] of Object.entries({ 'prototypes/v0.2': '0.2.0', 'prototypes/v0.4': '0.4.0' })) {
+  if (!existsSync(join(root, `${dir}/app.js`))) continue
+  const appJs = read(`${dir}/app.js`)
+  check(`${dir}/app.js（快照冻结）`, appJs.match(/version:\s*'([^']+)'/)?.[1], frozen)
+  const html = read(`${dir}/index.html`)
+  check(`${dir}/index.html（快照冻结）`, html.match(/<title>[^<]*?v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)<\/title>/)?.[1], frozen)
   const literals = [...new Set([...html.matchAll(/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g)].map((x) => x[1]))]
-  check('prototypes/v0.2/index.html 版本字面量（去重）', literals.join(', '), FROZEN_PROTOTYPE)
+  check(`${dir}/index.html 版本字面量（去重）`, literals.join(', '), frozen)
 }
 
 /* 1) 开发版页面标题里的 vX.Y.Z */
@@ -103,8 +105,8 @@ for (const c of checks) {
 if (problems.length) {
   console.error('\n版本号不一致：')
   for (const p of problems) console.error(`  - ${p}`)
-  console.error('\n改版本时请先改 VERSION，再让其余位置与它一致（见 docs/VERSIONING.md）。\n原型快照 prototypes/v0.2 冻结在 0.3.0，不随 VERSION 移动（D37）。')
+  console.error('\n改版本时请先改 VERSION，再让其余位置与它一致（见 docs/VERSIONING.md）。\n原型快照 prototypes/v0.2 冻结在 0.2.0、prototypes/v0.4 冻结在 0.4.0，不随 VERSION 移动（D37）。')
   process.exit(1)
 }
 
-console.log(`\n✓ 版本号一致：v${version}（共核对 ${checks.length} 处；原型快照冻结在 v${FROZEN_PROTOTYPE}）`)
+console.log(`\n✓ 版本号一致：v${version}（共核对 ${checks.length} 处；原型快照 v0.2 冻结在 0.2.0、v0.4 冻结在 0.4.0）`)

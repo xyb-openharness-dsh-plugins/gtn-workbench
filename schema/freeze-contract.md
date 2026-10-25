@@ -26,3 +26,9 @@
 ## 0003 内容边界（M5 开发版，v0.2.0 原型 12 页，2026-10-25 追加）
 
 新增 7 张表：营养（nutrition_rows/weight_rows）、心理（mood_rows/wait_rows/family_rows，整页私密仅本机）、临床研究登记摘录（trials）、指标分类卡（metric_cats）。无判读列（mood_rows.state 是用户自选三态原文）；不改不删 0001/0002 任何定义。
+
+| `0004_match.sql` | 2acbd437127915d1592a0c55ce1b200fcf19c2bc9c9985e17b0588161e3a9bc5 |
+
+## 0004 内容边界（v0.4.0，2026-10-25 追加）
+
+新增 2 张表：入排规则库（match_rules，条件存 JSON、pending 单列）与匹配评估快照（match_assessments，档案 revision + 规则集版本 + 逐条判定 JSON + 生成时间）。三档枚举只出现在 judgments_json 的 tier 键（satisfied/conflict/undetermined）；无 conclusion 类判读列（判读列断言继续生效）；不改不删 0001–0003 任何定义。

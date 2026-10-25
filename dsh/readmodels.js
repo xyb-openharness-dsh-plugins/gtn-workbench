@@ -117,6 +117,40 @@ function readCycles(db, key) {
   return out;
 }
 
+/* ---------------- 临床研究匹配（0004）：规则 × 评估 → demo-data 的 match 形状 ----------------
+ * 三档枚举 tier 只取 satisfied / conflict / undetermined；缺失/other 一律 undetermined；
+ * 排序按 trials 的数据来源顺序（ord），不按匹配度；待确认规则（pending=1）单列不进三档。 */
+
+export function readMatch(db) {
+  const meta = metaMap(db);
+  const asr = db.prepare('SELECT profile_revision, rule_set_version, judgments_json, generated_at FROM match_assessments ORDER BY rowid DESC').get();
+  if (!asr) {
+    return { profileRevision: null, ruleSetVersion: null, generatedAt: null, footerNote: meta.match_footer_note ?? null, channelsNote: meta.match_channels_note ?? null, entries: [] };
+  }
+  const jz = jp(asr.judgments_json, {});
+  const entries = rows(db, 'SELECT record_id FROM trials ORDER BY ord, rowid')
+    .map((t) => {
+      const rs = rows(db, 'SELECT id, rule_text, pending FROM match_rules WHERE trial_record_id = ? ORDER BY ord, rowid', t.record_id);
+      return {
+        recordId: t.record_id,
+        rules: rs.filter((r) => !r.pending).map((r) => {
+          const j = jz[String(r.id)] ?? {};
+          return { text: r.rule_text, tier: j.tier ?? 'undetermined', mine: j.mine ?? null, src: j.src ?? null };
+        }),
+        pending: rs.filter((r) => r.pending).map((r) => r.rule_text),
+      };
+    })
+    .filter((e) => e.rules.length > 0 || e.pending.length > 0);
+  return {
+    profileRevision: asr.profile_revision,
+    ruleSetVersion: asr.rule_set_version,
+    generatedAt: asr.generated_at,
+    footerNote: meta.match_footer_note ?? null,
+    channelsNote: meta.match_channels_note ?? null,
+    entries,
+  };
+}
+
 /* ---------------- 档案整体 ---------------- */
 
 function readProfile(db, key) {
@@ -193,6 +227,7 @@ function readProfile(db, key) {
     },
     metricCats: rows(db, 'SELECT key, name, latest, count, note, go, go_label FROM metric_cats ORDER BY ord, rowid')
       .map((r) => ({ key: r.key, name: r.name, latest: r.latest, count: r.count, note: r.note, go: r.go, goLabel: r.go_label })),
+    match: readMatch(db),
     /* settings 只回服务端可定值（目录/解析模式）；cred 状态由 /settings/mineru 单独给，packs 静态。 */
     settings: {
       dir: meta.settings_dir ?? null,
@@ -207,6 +242,11 @@ export function listSubjects(db) {
 
 export function getProfile(db, key) {
   return readProfile(db, key);
+}
+
+/** `/api/gtn/trials/match` 的 payload：最近一次评估（三档 + 待确认规则，无百分比无排序）。 */
+export function matchAssessment(db) {
+  return readMatch(db);
 }
 
 /**
