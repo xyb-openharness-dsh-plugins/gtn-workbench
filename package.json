@@ -1,0 +1,58 @@
+{
+  "name": "@xyb-community/gtn-workbench",
+  "version": "0.1.0",
+  "description": "本机优先的GTN患者工作台：hCG血清序列时间线、化疗疗程折叠卡档案、末次妊娠与FIGO评分整理、治愈后随访日历与再生育记录（0访谈如实声明，不做诊断与治疗建议）",
+  "private": true,
+  "type": "module",
+  "main": "./dsh/index.js",
+  "exports": {
+    ".": "./dsh/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "dsh",
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md",
+    "NOTICE.md"
+  ],
+  "scripts": {
+    "check": "node --check dsh/index.js && node --check lib/client.js && node scripts/check-workbench-package.mjs . && node scripts/check-host-contract.mjs",
+    "check:host": "node scripts/check-host-contract.mjs",
+    "test": "node --test test/*.test.mjs",
+    "audit": "node scripts/check-conformance.mjs .",
+    "release:check": "npm run check && npm run test && npm run audit",
+    "pack:check": "npm pack --dry-run",
+    "probe:artifact": "node scripts/serve-artifact.mjs",
+    "probe:tabs": "python3 scripts/verify-tabs-on-artifact.py",
+    "probe:page-view": "node scripts/probe-page-view.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "dsh-desktop-workbenches"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xyb-openharness-dsh-plugins/gtn-workbench"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1 <5",
+    "@deepseek-ai/dsh-client-connection": ">=0.1.0-rc.0 <0.3.0-0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.0 <0.3.0-0",
+    "@deepseek-ai/schemastery": ">=3.18.1 <4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "UNLICENSED"
+}

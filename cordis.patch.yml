@@ -1,0 +1,5 @@
+- insert:
+    - id: gtn-main
+      name: "@xyb-community/gtn-workbench"
+      config:
+        root: !!js dshHomePath('gtn-workbench')
