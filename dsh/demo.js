@@ -154,11 +154,40 @@ export function seedDemo(db, input) {
       insCand.run(key, null, 'hcg_import', null, c.status ?? 'pending', null, c.file, j(c.fields));
     }
 
-    /* demo_meta：meta 三件 + 随访计划参数 */
+    /* 营养支持（0003）：每餐记录 + 体重序列 */
+    const insMeal = db.prepare(`INSERT INTO nutrition_rows
+      (profile_key, d, meal, intake, ulcer, ulcer_note, folate, ord, in_use, revision_of)
+      VALUES (?,?,?,?,?,?,?,?,1,null)`);
+    D.nutrition.meals.forEach((m, i) => insMeal.run(key, m.d, m.meal, m.intake, m.ulcer, m.ulcerNote, m.folate, i));
+    const insWeight = db.prepare('INSERT INTO weight_rows (profile_key, d, value, ord, in_use, revision_of) VALUES (?,?,?,?,1,null)');
+    D.nutrition.weight.forEach((w, i) => insWeight.run(key, w.d, w.v, i));
+
+    /* 心理支持（0003，整页私密仅本机）：情绪 / 等报告日 / 家庭沟通 */
+    const insMood = db.prepare('INSERT INTO mood_rows (profile_key, d, state, text, ord, in_use, revision_of) VALUES (?,?,?,?,?,1,null)');
+    D.mind.moods.forEach((m, i) => insMood.run(key, m.d, m.state, m.text, i));
+    const insWait = db.prepare('INSERT INTO wait_rows (profile_key, d, text, cope, ord, in_use, revision_of) VALUES (?,?,?,?,?,1,null)');
+    D.mind.waitDays.forEach((m, i) => insWait.run(key, m.d, m.text, m.cope, i));
+    const insFamily = db.prepare('INSERT INTO family_rows (profile_key, d, who, text, ord, in_use, revision_of) VALUES (?,?,?,?,?,1,null)');
+    D.mind.family.forEach((m, i) => insFamily.run(key, m.d, m.who, m.text, i));
+
+    /* 临床研究（0003）：登记摘录快照，与 research jsonl 同步（check-prototype 逐条断言） */
+    const insTrial = db.prepare('INSERT INTO trials (record_id, title, sponsor, status, source, url, ord) VALUES (?,?,?,?,?,?,?)');
+    D.trials.items.forEach((t, i) => insTrial.run(t.recordId, t.title, t.sponsor, t.status, t.source, t.url, i));
+
+    /* 指标分类卡（0003）：归口与入口 */
+    const insCat = db.prepare('INSERT INTO metric_cats (key, name, latest, count, note, go, go_label, ord) VALUES (?,?,?,?,?,?,?,?)');
+    D.metricCats.forEach((c, i) => insCat.run(c.key, c.name, c.latest, c.count, c.note, c.go, c.goLabel, i));
+
+    /* demo_meta：meta 三件 + 随访计划参数 + 营养/心理/研究页文案 */
     const insMeta = db.prepare('INSERT OR REPLACE INTO demo_meta (key, text) VALUES (?,?)');
     for (const [k, v] of Object.entries(D.meta || {})) insMeta.run(k, String(v));
     insMeta.run('followup_plan_months', String(D.followup.planMonths));
     insMeta.run('followup_anchor_label', D.followup.anchorLabel);
+    insMeta.run('nutrition_note', D.nutrition.note);
+    insMeta.run('nutrition_quote', D.nutrition.quote);
+    insMeta.run('mind_quote', D.mind.quote);
+    insMeta.run('trials_source_label', D.trials.sourceLabel);
+    insMeta.run('trials_disclaimer', D.trials.disclaimer);
 
     db.exec('COMMIT');
   } catch (error) {

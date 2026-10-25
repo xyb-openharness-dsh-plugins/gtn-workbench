@@ -20,3 +20,9 @@
 ## 0002 内容边界（M5 开发版，2026-10-25 追加）
 
 新增 pathology_rows 表 + 8 张表追加列（hcg_rows/chemo_cycles 更正链元数据、pregnancy_rows 展示字段、followup_rows.hcg_text 原文、candidates 文件与字段 JSON）。无判读列；不改不删 0001 任何定义。
+
+| `0003_dev2.sql` | 024a333ebdd243650be474517fa2af8c8b7769d785979389f6fa45f40eb67804 |
+
+## 0003 内容边界（M5 开发版，v0.2.0 原型 12 页，2026-10-25 追加）
+
+新增 7 张表：营养（nutrition_rows/weight_rows）、心理（mood_rows/wait_rows/family_rows，整页私密仅本机）、临床研究登记摘录（trials）、指标分类卡（metric_cats）。无判读列（mood_rows.state 是用户自选三态原文）；不改不删 0001/0002 任何定义。

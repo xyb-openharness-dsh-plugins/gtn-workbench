@@ -1,12 +1,74 @@
 'use strict';
-/* 小葡宝 GraPal v0.2.0 — GTN 工作台交互原型（M2，用户看板反馈版）。
-   数据唯一来源：window.DEMO_DATA（demo-data.js，全部模拟）。
+/* 小葡宝 GraPal v0.3.0 — GTN 工作台开发版（M5，由交互原型 v0.2.0 逐字符移植）。
+   视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对）；开发版只换数据来源：
+   先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.2.0', build: '2026-10-25' };
-const D = window.DEMO_DATA;
+const APP_INFO = { version: '0.3.0', build: '2026-10-25' };
+let D = window.DEMO_DATA;
+let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
+
+/* ---------------- 数据层（开发版法定新增，视图函数一概不动） ---------------- */
+/* apiBase 定稿契约（v0.1.3）：API_BASE = 挂载前缀（独立启动空串，宿主 /api/gtn 形态），
+   页面统一拼 `${API_BASE}/api/gtn/xxx`。守卫只禁交界重复 /api/api（/(^|/)api$/ 正则），
+   不许 includes('/api') 一刀切——宿主前缀含 /api 是允许的形态。
+   页面在 `<前缀>/api/gtn/ui/` 下，所以把结尾的 /api/gtn/ui 去掉就是挂载前缀。 */
+function apiBase() {
+  const m = location.pathname.match(/^(.*)\/api\/gtn\/ui(?:\/|$)/);
+  return m ? m[1] : '';
+}
+/** 交界守卫：前缀本身以 /api 结尾时，拼接会产生 /api/api 重复——这是唯一禁止的形态。 */
+function apiBaseInvalid(base) {
+  return /(^|\/)api$/.test(base);
+}
+
+/** 拉本机库数据。返回 {reachable, payload}：reachable=false 才允许回退演示数据。 */
+async function loadBootstrap() {
+  const url = `${apiBase()}/api/gtn/bootstrap`;
+  try {
+    const res = await fetch(url, { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+    if (!res.ok) return { reachable: false, payload: null };
+    const payload = await res.json();
+    return { reachable: true, payload: payload && payload.data ? payload : null };
+  } catch { return { reachable: false, payload: null }; }
+}
+
+/** 启动期横幅：校验失败 / 掉线时如实说明，禁止裸 throw 白屏。 */
+function showBanner(level, html) {
+  const b = $('#data-banner');
+  if (!b) return;
+  b.dataset.level = level;
+  b.innerHTML = html;
+  b.hidden = false;
+}
+
+/** 把 bootstrap 的 data 并进 D：settings 的 cred/packs 是前端侧展示配置，保留回退值。 */
+function applyData(payload) {
+  const s = { ...(window.DEMO_DATA.settings || {}), ...(payload.data.settings || {}) };
+  D = { ...window.DEMO_DATA, ...payload.data, settings: s };
+  if (payload.version) {
+    APP_INFO.version = payload.version;
+    APP_INFO.build = payload.build || APP_INFO.build;
+    const v = $('#app-version'), b = $('#app-build');
+    if (v) v.textContent = `v${payload.version}`;
+    if (b) b.textContent = payload.build || APP_INFO.build;
+  }
+  /* 面板宽度档位以服务端下发为准（lib/layout.js 唯一来源），页面不留第二份默认值。 */
+  const ap = payload.layout && payload.layout.agentPane;
+  if (ap) {
+    agentDock.min = ap.min ?? agentDock.min;
+    agentDock.max = ap.max ?? agentDock.max;
+    agentDock.step = ap.ratioStep ?? agentDock.step;
+    const sp = $('#agent-splitter');
+    if (sp) {
+      sp.setAttribute('aria-valuemin', String(Math.round(agentDock.min * 100)));
+      sp.setAttribute('aria-valuemax', String(Math.round(agentDock.max * 100)));
+    }
+    agentWidthApply(ap.default ?? agentDock.width);
+  }
+}
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
@@ -786,6 +848,10 @@ function agentDraft(promptText) {
   const ta = $('#agent-input');
   if (!ta) return;
   ta.value = promptText;
+  /* 宿主形态：同时把草稿递给外壳的 DSH 原生会话（只填入，不代发——IP10 同款守卫）。 */
+  if (window.parent !== window) {
+    try { window.parent.postMessage({ type: 'gtn:agent-draft', prompt: promptText }, window.location.origin); } catch { /* 外壳收不到时留在本页输入框 */ }
+  }
   toast('提示词已放进输入框，不会自动发送；请先阅读确认，再自行点「发送」。');
 }
 function agentSend() {
@@ -801,6 +867,17 @@ const actions = {
   'open-store'() { toast(`资料目录：${state.storeDir}（演示路径，更换入口在设置页；更换不清库）`); },
   'agent-draft'(el) { agentDraft(el.dataset.prompt || ''); },
   'agent-send'() { agentSend(); },
+  /* AI 会话外壳（开发版）：开合只切显隐，不结束/删除会话 */
+  'agent-toggle'() {
+    if (agentDock.state === 'unavailable') { toast('AI 对话暂不可用：当前是独立启动（没有 DSH 原生会话）。装进 Desktop 后顶栏即可调起。'); return; }
+    if (window.parent !== window) {
+      try { window.parent.postMessage({ type: 'gtn:agent-toggle' }, window.location.origin); } catch { /* 宿主收不到时按本地态走 */ }
+      agentPaneApply(agentDock.state === 'open' ? 'collapsed' : 'idle');
+      return;
+    }
+    agentPaneApply(agentDock.state === 'open' ? 'collapsed' : 'unavailable');
+  },
+  'agent-hide'() { agentPaneApply('collapsed'); },
   /* hCG */
   'add-hcg'() { formAddHcg(); },
   'save-hcg'() {
@@ -971,5 +1048,119 @@ $('#scrim').addEventListener('click', closeDrawer);
   });
 })();
 
-/* ---------------- 启动 ---------------- */
-render();
+/* ---------------- AI 会话面板外壳（开发版法定新增：顶栏五态 + 拖宽 + 收起） ----------------
+   五态：AI 对话 / 正在连接… / 收起 AI 对话 / 打开 AI 对话 / AI 对话暂不可用。
+   宿主形态（window.parent !== window）由 lib/client.js 的原生会话接管，页面只听状态消息；
+   独立启动没有原生会话，如实显示「暂不可用」，不自建聊天框兜底。
+   收起只切 paneOpen 与 display，不调用任何 close/delete；宽度存 localStorage，读回过 clamp。 */
+const AGENT_WIDTH_KEY = 'grapal.gtn.agent-pane.v1';
+const AGENT_LABELS = {
+  idle: 'AI 对话', connecting: '正在连接…', open: '收起 AI 对话',
+  collapsed: '打开 AI 对话', unavailable: 'AI 对话暂不可用'
+};
+const agentDock = { state: 'unavailable', width: 0.35, min: 0.25, max: 0.45, step: 0.02 };
+
+function agentPaneApply(stateName, note) {
+  agentDock.state = stateName;
+  const btn = $('#agent-toggle'), label = $('#agent-label');
+  const dock = $('#agent-dock'), splitter = $('#agent-splitter');
+  if (!btn || !label) return;
+  btn.dataset.state = stateName;
+  const text = AGENT_LABELS[stateName] || 'AI 对话';
+  label.textContent = text;
+  btn.setAttribute('aria-label', `AI 对话：${text}`);
+  const show = stateName === 'open' || stateName === 'connecting';
+  btn.setAttribute('aria-expanded', String(show));
+  if (dock) dock.hidden = !show;
+  if (splitter) splitter.hidden = stateName !== 'open';
+  const n = $('#agent-note');
+  if (n) n.textContent = note || '';
+  if (stateName === 'unavailable') {
+    const body = $('#agent-body');
+    if (body) body.innerHTML = '<p>当前环境没有 DSH 原生会话（独立启动不自带聊天服务）。</p><p>装进 DSH Desktop 后，顶栏「AI 对话」会调起原生会话；业务页的记录与整理不依赖会话，照常可用。</p>';
+  }
+}
+
+function agentWidthApply(w) {
+  const clamped = Math.min(agentDock.max, Math.max(agentDock.min, w));
+  agentDock.width = Math.round(clamped * 10000) / 10000;
+  const dock = $('#agent-dock'), splitter = $('#agent-splitter');
+  const pct = Math.round(agentDock.width * 100);
+  if (dock) dock.style.flexBasis = `${pct}%`;
+  if (splitter) splitter.setAttribute('aria-valuenow', String(pct));
+  try { localStorage.setItem(AGENT_WIDTH_KEY, JSON.stringify({ width: agentDock.width })); } catch { /* 隐私模式忽略 */ }
+}
+
+/** splitter 拖动四条：容器 rect 夹取 / role=separator / 键盘同精度 / localStorage 过 clamp。 */
+function agentShellWire() {
+  const btn = $('#agent-toggle'), splitter = $('#agent-splitter');
+  if (!btn || !splitter) return;
+  try { const saved = JSON.parse(localStorage.getItem(AGENT_WIDTH_KEY) || 'null'); if (saved && Number.isFinite(saved.width)) agentWidthApply(saved.width); } catch { /* 坏值忽略 */ }
+
+  /* 开合走 document 委托（data-action="agent-toggle"/"agent-hide"），这里不再绑第二份。 */
+  let host = null;
+  splitter.addEventListener('pointerdown', (e) => { e.preventDefault(); host = $('#work-grid'); splitter.setPointerCapture(e.pointerId); });
+  splitter.addEventListener('pointermove', (e) => {
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    if (!rect.width) return;
+    agentWidthApply((rect.right - e.clientX) / rect.width);   // 会话在右：指针越靠左越宽
+  });
+  splitter.addEventListener('pointerup', () => { host = null; });
+  splitter.addEventListener('keydown', (e) => {
+    const delta = { ArrowLeft: agentDock.step, ArrowRight: -agentDock.step }[e.key];
+    if (delta !== undefined) { e.preventDefault(); agentWidthApply(agentDock.width + delta); return; }
+    if (e.key === 'Home') { e.preventDefault(); agentWidthApply(agentDock.max); }
+    if (e.key === 'End') { e.preventDefault(); agentWidthApply(agentDock.min); }
+  });
+
+  if (window.parent !== window) {
+    /* 宿主形态：状态由外壳（lib/client.js）推送；页面只上报开合意图，不自建会话。 */
+    agentPaneApply('idle');
+    window.addEventListener('message', (e) => {
+      if (e.origin !== window.location.origin) return;
+      const msg = e.data;
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.type === 'gtn:agent-state' && AGENT_LABELS[msg.state]) agentPaneApply(msg.state, msg.note || '');
+    });
+  } else {
+    agentPaneApply('unavailable');
+  }
+}
+
+/* ---------------- 设置页凭据状态同步（来自 /api/gtn/settings/mineru，不收集真实密钥） ---------------- */
+async function syncCredStatus() {
+  try {
+    const res = await fetch(`${apiBase()}/api/gtn/settings/mineru`, { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+    if (!res.ok) return;
+    const st = await res.json();
+    D.settings.cred = {
+      source: st.sourceLabel || '本机密钥文件',
+      status: st.configured ? `已配置（${st.masked}）` : (st.sourceLabel || '尚未配置')
+    };
+    if (st.error) D.settings.cred.status = `${D.settings.cred.status} · ${st.error}`;
+  } catch { /* 掉线时保留回退文案，不报错 */ }
+}
+
+/* ---------------- 启动（异步化：先拿数据再渲染，失败渲染横幅，禁止裸 throw） ---------------- */
+async function init() {
+  agentShellWire();
+  const base = apiBase();
+  if (apiBaseInvalid(base)) {
+    showBanner('error', `<b>接口基址校验失败。</b>当前挂载前缀「${esc(base)}」以 /api 结尾，与页面的 /api/gtn 拼接会产生 /api/api 重复。请在宿主里换一个挂载前缀；页面保持离线演示数据，不会白屏。`);
+    DATA_SOURCE = 'demo';
+  } else {
+    const { reachable, payload } = await loadBootstrap();
+    if (reachable && payload) {
+      applyData(payload);
+      DATA_SOURCE = 'api';
+      showBanner('info', `<b>已连接本机资料库。</b>数据来自你选定的资料目录；演示档案（林小葡）仅在空库时播种一次。`);
+      void syncCredStatus();
+    } else {
+      DATA_SOURCE = 'demo';
+      showBanner('warn', '<b>离线演示数据。</b>本机服务（/api/gtn/bootstrap）没有应答：如果这是静态打开或服务未启动，看到的是演示档案，改动不会保存。');
+    }
+  }
+  render();
+}
+init();

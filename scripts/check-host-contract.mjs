@@ -25,7 +25,10 @@ import { existsSync, readFileSync } from 'node:fs'
 const read = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '')
 const client = read('lib/client.js')
 const layout = read('lib/layout.js')
-const both = `${client}\n${layout}`
+/* 比对前去掉注释行：build-client 生成头里会写 "面板 customFrame=true · …" 的说明注释，
+   把注释当代码抓会让 customFrame 判定永远失败（2026-10-25 M5 实跑踩到）。 */
+const stripComments = (src) => src.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+const both = `${stripComments(client)}\n${stripComments(layout)}`
 const problems = []
 const notes = []
 
@@ -65,8 +68,14 @@ else if (!/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+?(?:\.git)?\/
 }
 
 // 4) customFrame 必须是 boolean（宿主：Invalid custom frame flag）
-const cf = both.match(/["']?(?:customFrame|CUSTOM_FRAME)["']?\s*[:=]\s*([^,}\n]+)/)?.[1]?.trim()
-if (cf && !/^(true|false)$/.test(cf)) problems.push(`customFrame 不是 true/false 字面量：${cf}（宿主：Invalid custom frame flag）`)
+const cf = both.match(/["']?customFrame["']?\s*:\s*([a-zA-Z0-9_.]+)/)?.[1]?.trim()
+/* lib/client.js 的描述符写的是常量名（customFrame: CUSTOM_FRAME）：解析到 const 定义再判。 */
+let cfResolved = cf
+if (cf === 'CUSTOM_FRAME') {
+  const def = client.match(/const CUSTOM_FRAME = (.+)$/m)?.[1]?.trim()
+  cfResolved = def === 'true' || def === "'true' === 'true'" ? 'true' : def === 'false' ? 'false' : def
+}
+if (cfResolved && !/^(true|false)$/.test(cfResolved)) problems.push(`customFrame 不是 true/false 字面量：${cf} → ${cfResolved}（宿主：Invalid custom frame flag）`)
 
 // 5) businessSide ∈ {left,right}（宿主：Invalid workbench business side）
 const side = both.match(/["']?(?:businessSide|BUSINESS_SIDE)["']?\s*[:=]\s*["']([^"']+)["']/)?.[1]
@@ -94,7 +103,7 @@ const hl = both.match(/["']?headerLayout["']?\s*:\s*["']([^"']+)["']/)?.[1]
 if (hl && !['default', 'compact'].includes(hl)) problems.push(`headerLayout 只能是 default/compact，当前 ${hl}`)
 
 console.log('宿主注册契约自查（lib/client.js + lib/layout.js）')
-console.log(`  customFrame=${cf ?? '未设'} · businessSide=${side ?? '未设'} · businessWidth=${width ?? '未设'}`)
+console.log(`  customFrame=${cfResolved ?? cf ?? '未设'} · businessSide=${side ?? '未设'} · businessWidth=${width ?? '未设'}`)
 for (const n of notes) console.log(`  · ${n}`)
 if (problems.length) {
   console.error(`\n✗ ${problems.length} 条不合格——这份包装进 Desktop 后会激活失败：`)

@@ -36,6 +36,11 @@ function packEntries() {
 const entries = packEntries()
 const has = (path) => entries.includes(path)
 
+test('tgz 里必须有 dsh/index.js 与 lib/client.js（宿主接线两入口）', () => {
+  assert.ok(has('dsh/index.js'), `缺 dsh/index.js；实际条目：${entries.join(', ')}`)
+  assert.ok(has('lib/client.js'), `缺 lib/client.js；实际条目：${entries.join(', ')}`)
+})
+
 test('tgz 里必须有 cordis.patch.yml（否则宿主不会加载本插件）', () => {
   assert.ok(has('cordis.patch.yml'), `缺 cordis.patch.yml；实际条目：${entries.join(', ')}`)
 })
@@ -45,13 +50,13 @@ test('有 public/ 就必须随包发出（漏了它装机后业务区空白）',
   assert.ok(has('public/index.html'), `缺 public/index.html；实际条目：${entries.join(', ')}`)
 })
 
-test('有 schema/migrations/ 就必须随包发出（漏了它装进去是空库）', () => {
-  const dir = join(root, 'schema', 'migrations')
+test('有 schema/*.sql 就必须随包发出（漏了它装进去是空库）', () => {
+  const dir = join(root, 'schema')
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return
-  const migrations = entries.filter((p) => /^schema\/migrations\/.+\.sql$/.test(p))
+  const migrations = entries.filter((p) => /^schema\/.+\.sql$/.test(p))
   assert.ok(
     migrations.length > 0,
-    `schema/migrations 下有 SQL 但一个都没打进包，装进去会静默空库；实际条目：${entries.join(', ')}`,
+    `schema/ 下有 SQL 但一个都没打进包，装进去会静默空库；实际条目：${entries.join(', ')}`,
   )
 })
 

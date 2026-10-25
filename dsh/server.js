@@ -114,6 +114,7 @@ export function createHandler({ workbench }) {
     },
     version: workbench.version,
     build: workbench.build,
+    workspace: workbench.workspace,
     serveUi: (req, res, urlPath) => servePublic(req, res, urlPath),
   })
 
