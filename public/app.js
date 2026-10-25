@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.7.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
+/* 小葡宝 GraPal v0.8.0 — GTN 工作台开发版（一图秀 rail 多指标趋势 + 分类卡原位翻转 + 临床研究分层命中 v2）。
    视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.7.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.8.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -87,10 +87,10 @@ const SUBTITLES = {
   diagnosis: '末次妊娠档案、FIGO 评分自录（照抄原始分）、病理原文摘录。',
   treatment: '每疗程一张折叠卡；改过就新增版本，旧值可查。',
   followup: '以你勾选的 hCG 达正常锚点为起点，按月记录。',
-  oneshow: '清宫 → hCG 序列 → 疗程 → 锚点 → 随访，一张图讲完病程。',
+  oneshow: '左栏筛指标（最多 4 条），主区多指标趋势；每条线按自身全部记录范围缩放，不能横向比大小。',
   nutrition: '化疗期每餐记录、口腔溃疡期进食影响、体重序列；叶酸只按医嘱记录。',
   mind: '情绪日记、等报告日的焦虑、家人沟通；私密记录仅本机。',
-  trials: '登记摘录 + 入组档案 + 三档匹配（已满足 / 可能冲突 / 无法判定），入组判断属于医生与研究中心。',
+  trials: '登记摘录 + 入组档案 + 分层命中线索（结构化 / 文本 / 宽口径）+ 无法自动匹配逐条说明；登记状态，未核实。',
   import: '上传报告 → 逐文件授权 → 候选核对 → 入档；拒收零副作用。',
   review: '勾选范围生成一份材料，与档案同源。',
   settings: '资料目录、解析模式与凭据状态、临床参考数据包来源与版本。'
@@ -141,8 +141,16 @@ const state = {
   keypad: null,              // { input, title }
   pin: null,                 // hCG 图选中的点
   flipped: new Set(),        // 已翻转的指标分类卡（key 集合）
+  trialFavs: new Set(),      // 收藏的试验（saved_trial 心智：trial_key 集合，仅本机演示态）
   trialFilter: 'all',        // 临床研究来源筛选：all | chinadrugtrials
-  trialFavs: new Set()       // 匹配结果卡收藏（record_id 集合，仅本机态）
+  savedTrials: new Set(),    // 收藏的登记条目（saved_trial 心智：只留线索，record_id 集合，仅本机态）
+  /* 一图秀（breast rail 口径）：时间范围 + 指标勾选（≤4）+ 显示开关 + 点选 pin */
+  oneshow: {
+    range: 'all',            // '3m' | '6m' | '12m' | 'all'
+    sel: ['hcg', 'wbc'],     // 序列 key；上限 4，超限 toast（breast rail 口径）
+    toggles: { treatment: true, keypoints: true, changes: true },
+    pin: null                // 'key|date' 字符串（点选记录点）
+  }
 };
 let uidSeq = 0;
 const uid = (p) => p + (++uidSeq);
@@ -233,34 +241,83 @@ function agentPane(promptText) {
   </section>`;
 }
 
-/* ---------------- 指标分类 3D 翻转卡（看板 + hCG 时间线） ----------------
-   写法照乳腺癌基准（.mcard）：perspective 容器 + preserve-3d 内层 + rotateY(180deg) 翻面，
-   backface-visibility:hidden 双面；按钮原生 Enter/Space 触发 click，键盘可达；
-   aria-pressed 同步翻转态。分类卡只做归口不画曲线；数值序列在「检查与指标」各二级页签画线。 */
+/* ---------------- 指标分类 3D 翻转卡（看板 + hCG 时间线，v0.8 固定尺寸原位翻转） ----------------
+   写法照乳腺癌 / NF 基准（.mcard / sparkPts）：perspective 容器 + preserve-3d 内层 + rotateY(180deg) 翻面，
+   backface-visibility:hidden 双面；按钮原生 Enter/Space 触发 click，键盘可达；aria-pressed 同步翻转态。
+   正面：分类色点 + 当前值 + 单位 + 较前次箭头（↑↓→ + 差值 / 首次记录）+ 记录数；
+   背面：代表序列 sparkline（两端值标注 + 两端日期行）+ 脚注「仅回顾已记录值」；
+   单点序列背面写「再记录一次后显示趋势」；无序列分类（影像随访）背面说明「无序列」。
+   分类卡只做归口：代表序列只挑一条画 spark，完整多序列趋势在「检查与指标」各二级页签。 */
+const CAT_COLOR = { hcg: '#7b5ea7', cbc: '#3f7f5e', liver: '#b06a2c', imaging: '#5a6acf' };
+function catColor(key) { return CAT_COLOR[key] || 'var(--brand)'; }
+/** 分类卡的代表序列（正面当前值 / 背面 spark 都用它；影像类返回 null=无序列）。 */
+function catRepSeries(c) {
+  if (c.key === 'hcg') return { name: '血 hCG', unit: D.hcg.unit, points: D.hcg.points, source: '市一医院' };
+  if (c.key === 'cbc') { const s = seriesByGroup('cbc').find((x) => x.key === 'wbc'); return s ? { name: s.name, unit: s.unit, points: s.points, source: s.source } : null; }
+  if (c.key === 'liver') { const s = seriesByGroup('liver').find((x) => x.key === 'alt'); return s ? { name: s.name, unit: s.unit, points: s.points, source: s.source } : null; }
+  return null;   // imaging 等无序列分类
+}
+/** 卡背面 sparkline：两端值标注（NF sparkPts 口径，smoothPath 沿用）。 */
+function sparkPts(pts, color) {
+  const w = 200, h = 56, pad = 10;
+  const vals = pts.map((p) => p.v);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = hi - lo || Math.max(Math.abs(hi) * 0.08, 1);
+  const coords = pts.map((p, i) => ({ x: pad + i * (w - pad * 2) / Math.max(pts.length - 1, 1), y: h - 14 - (p.v - lo) / span * (h - 26) }));
+  const first = coords[0], last = coords[coords.length - 1];
+  return `<svg class="chart spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="代表序列最近 ${pts.length} 次记录折线，两端标注数值">
+    <path class="line" d="${smoothPath(coords)}" pathLength="1" style="stroke:${color}"/>
+    ${coords.map((cm, i) => `<circle class="pt" cx="${cm.x.toFixed(1)}" cy="${cm.y.toFixed(1)}" r="${i === 0 || i === coords.length - 1 ? 3.2 : 2.2}" fill="${color}"/>`).join('')}
+    <text x="${Math.max(first.x, 16).toFixed(1)}" y="${Math.max(first.y - 7, 10).toFixed(1)}" text-anchor="middle" fill="${color}">${pts[0].v}</text>
+    <text x="${Math.min(last.x, w - 16).toFixed(1)}" y="${Math.max(last.y - 7, 10).toFixed(1)}" text-anchor="middle" fill="${color}">${pts[pts.length - 1].v}</text>
+  </svg>`;
+}
 function metricCatCard(c) {
   const flipped = state.flipped.has(c.key);
-  return `<button class="mcard" data-action="flip" data-key="${c.key}" aria-pressed="${flipped}" aria-label="指标分类：${esc(c.name)}，最近 ${esc(c.latest)}，共 ${c.count} 次；点按或回车翻到背面看记录说明">
+  const color = catColor(c.key);
+  const rep = catRepSeries(c);
+  const pts = rep ? rep.points : [];
+  const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+  /* 较前次箭头：↑ 升 / ↓ 降 / → 持平（只陈述差值，不写高低好坏）；单点=首次记录 */
+  const delta = prev
+    ? `较前次 ${last.v > prev.v ? '↑' : last.v < prev.v ? '↓' : '→'} <em>${Math.abs(last.v - prev.v)}</em> ${esc(rep.unit)}`
+    : pts.length === 1 ? '首次记录' : '';
+  let back;
+  if (pts.length > 1) {
+    back = `<span class="name">${esc(c.name)} · ${esc(rep.name)}（代表序列）</span>
+      ${sparkPts(pts, color)}
+      <span class="spark-dates"><span>${esc(pts[0].d)}</span><span>${esc(last.d)}</span></span>
+      <span class="count">共 ${pts.length} 次 · 完整多序列在「检查与指标」对应页签</span>
+      <span class="mfoot">仅回顾已记录值 · 点按 / 回车返回</span>`;
+  } else if (pts.length === 1) {
+    back = `<span class="name">${esc(c.name)} · ${esc(rep.name)}</span>
+      <span class="note">只有 1 次记录，暂不连线。<br>再记录一次后显示趋势。</span>
+      <span class="mfoot">仅回顾已记录值 · 点按 / 回车返回</span>`;
+  } else {
+    back = `<span class="name">${esc(c.name)} · 无序列</span>
+      <span class="note">${esc(c.note)}</span>
+      <span class="count">影像 / 病理是报告摘录，不是数值序列——本分类无序列可画，原文在诊断档案。</span>
+      <span class="mfoot">点按 / 回车返回</span>`;
+  }
+  return `<button class="mcard" data-action="flip" data-key="${c.key}" aria-pressed="${flipped}" aria-label="指标分类：${esc(c.name)}，${rep && last ? `当前 ${last.v} ${rep.unit}，` : ''}已记录 ${pts.length || c.count} 次；点按或回车翻到背面看趋势与说明">
     <span class="mcard-inner">
       <span class="mface front" aria-hidden="true">
-        <span class="cat"><i></i>指标分类</span>
+        <span class="cat"><i style="background:${color}"></i>指标分类</span>
         <span class="name">${esc(c.name)}</span>
-        <span class="val">${esc(c.latest)}</span>
-        <span class="rec">已记录 ${c.count} 次</span>
+        ${rep && last ? `<span class="val">${last.v}<small> ${esc(rep.unit)}</small></span><span class="delta">${delta}</span>` : `<span class="val">${esc(c.latest)}</span><span class="delta">无数值序列</span>`}
+        <span class="rec">已记录 ${pts.length || c.count} 次${rep && last ? ` · ${esc(last.d)}` : ''}</span>
         <span class="meta"><span>点按 / 回车翻转</span><span class="hint">↻</span></span>
       </span>
       <span class="mface back" aria-hidden="true">
-        <span class="name">${esc(c.name)} · 记录说明</span>
-        <span class="note">${esc(c.note)}</span>
-        <span class="count">本分类卡不画曲线；数值序列在「检查与指标」对应二级页签画线</span>
-        <span class="go">${esc(c.goLabel)} →</span>
+        ${back}
       </span>
     </span>
   </button>`;
 }
 function metricCatGrid() {
-  return `<section class="card"><div class="card-head"><h2>指标分类（点卡片翻转）</h2><span class="muted">四类 · 正面看最近值，背面看说明与入口</span></div>
+  return `<section class="card"><div class="card-head"><h2>指标分类（点卡片原位翻转）</h2><span class="muted">四类 · 正面看当前值与较前次，背面看趋势两端值</span></div>
     <div class="mgrid">${D.metricCats.map(metricCatCard).join('')}</div>
-    <p class="muted small">分类卡只做归口；血 hCG 曲线在「检查与指标 → 血 hCG」页签，多系列趋势在各对应页签。</p>
+    <p class="muted small">分类卡只做归口（血常规以白细胞、肝肾功能以 ALT 为代表序列）；完整多序列趋势在「检查与指标」各二级页签。</p>
   </section>`;
 }
 
@@ -810,10 +867,39 @@ function oneshowChart() {
 }
 
 function vOneshow() {
+  const series = oneshowSeries();
+  const groups = ['血 hCG', '血常规', '肝肾功能', '体重'];
+  const pickers = groups.map(g => {
+    const list = series.filter(x => x.group === g);
+    if (!list.length) return '';
+    return `<div class="cat-label">${esc(g)}</div>` + list.map(x =>
+      `<label class="metric-pick"><input type="checkbox" data-oc-metric="${x.key}" ${state.oneshow.sel.includes(x.key) ? 'checked' : ''}><i style="background:${x.color}"></i><span>${esc(x.name)}</span><small>${x.points.length ? x.points[x.points.length - 1].v : '—'}</small></label>`).join('');
+  }).join('');
   return `${pageHead('oneshow')}
-  <div class="card chart-card"><div class="card-head"><h2>全程病程一图秀</h2><span class="muted">清宫 → hCG 序列 → 疗程 → 锚点 → 随访</span></div>
+  <div class="one-grid">
+    <aside class="rail" aria-label="一图秀筛选项">
+      <section><h3>时间范围</h3><div class="chips">
+        ${[['3m', '近 3 月'], ['6m', '近 6 月'], ['12m', '近 12 月'], ['all', '全部']].map(([k, l]) => `<button class="chip${state.oneshow.range === k ? ' on' : ''}" data-action="oc-range" data-arg="${k}" aria-pressed="${state.oneshow.range === k}">${l}</button>`).join('')}
+      </div></section>
+      <section><h3>选择指标 <small>最多 4 个 · 已选 ${state.oneshow.sel.length}</small></h3>
+        ${pickers}
+        <p class="muted small">点选后图表立即更新。</p>
+      </section>
+      <section><h3>显示内容</h3><div class="chips">
+        ${[['treatment', '治疗节点'], ['keypoints', '关键点数值'], ['changes', '变化 ≥20%']].map(([k, l]) => `<button class="chip${state.oneshow.toggles[k] ? ' on' : ''}" data-action="oc-toggle" data-arg="${k}" aria-pressed="${state.oneshow.toggles[k]}">${l}</button>`).join('')}
+      </div></section>
+    </aside>
+    <div class="one-main">
+      <section class="card chart-card"><div class="card-head"><h2>病程时间轴</h2><span class="muted">只呈现已记录的值 · 每条线按自身范围缩放</span></div>
+        <div class="legend">${oneshowLegend(series)}</div>
+        <div class="chart-wrap">${oneshowMultiChart(series)}</div>
+        <div id="oc-pin">${oneshowPinHTML(series)}</div>
+      </section>
+    </div>
+  </div>
+  <div class="card"><div class="card-head"><h2>病程阶段条（档案事实，非判读）</h2></div>
     <div class="chart-wrap">${oneshowChart()}</div>
-    <p class="legend"><span class="line-chip"><i class="diamond"></i>关键事件（由你勾选 / 档案自述）</span><span class="line-chip">阶段条按档案记录时段排列</span></p>
+    <p class="muted small">阶段与事件均来自本档案记录（事件由你勾选 / 档案自述）；不画参考区间带。</p>
   </div>
   <div class="card"><div class="card-head"><h2>阶段清单（与图同源）</h2></div>
     <div class="rows">
@@ -827,6 +913,82 @@ function vOneshow() {
   </div>
   ${agentPane('请帮我把一图秀的五个阶段各写一句话，给不熟悉病情的家人看：只陈述日期与记录，不加判定、不用医学结论词。')}
   ${quoteLine(QUOTE.none)}`;
+}
+
+/* 一图秀序列集：hCG 主线 + 多系列指标 + 体重（breast rail 口径，分组勾选 ≤4）。 */
+const ONE_PALETTE = ['#8a4b6f', '#2f6f8f', '#4b8a5a', '#b0803a', '#7a5ab0', '#a04b4b', '#3a8a8a', '#8a7a3a'];
+function oneshowSeries() {
+  const list = [];
+  const add = (key, name, unit, group, points, source, color) => { if (points.length) list.push({ key, name, unit, group, points, source, color }); };
+  add('hcg', `血 hCG（${D.hcg.unit}，对数心智）`, D.hcg.unit, '血 hCG', D.hcg.points.map(p => ({ d: p.d, v: p.v, src: p.src })), 'hCG 时间线', ONE_PALETTE[0]);
+  const G = { cbc: '血常规', liver: '肝肾功能' };
+  D.metrics.series.forEach((s, i) => add(s.key, `${s.name}（${s.unit}）`, s.unit, G[s.group] || s.group, s.points, s.source, ONE_PALETTE[(i + 1) % ONE_PALETTE.length]));
+  add('weight', '体重（kg）', 'kg', '体重', D.nutrition.weight.map(p => ({ d: p.d, v: p.v, src: '手工记录' })), '营养支持', ONE_PALETTE[7]);
+  return list;
+}
+function oneshowDomain() {
+  const t = oneshowSeries().flatMap(x => x.points.map(p => Date.parse(p.d)));
+  const t1 = Math.max(...t, Date.now());
+  if (state.oneshow.range === '3m') return [t1 - 92 * 864e5, t1];
+  if (state.oneshow.range === '6m') return [t1 - 183 * 864e5, t1];
+  if (state.oneshow.range === '12m') return [t1 - 365 * 864e5, t1];
+  return [Math.min(...t), t1];
+}
+function oneshowLegend(series) {
+  return series.filter(x => state.oneshow.sel.includes(x.key)).map(x => {
+    const vs = x.points.map(p => p.v);
+    return `<span class="line-chip"><i style="background:${x.color}"></i><b>${esc(x.name)}</b> 最近 ${vs[vs.length - 1]} ${esc(x.unit)} <em>全期 ${Math.min(...vs)}–${Math.max(...vs)}</em></span>`;
+  }).join('');
+}
+function oneshowPinHTML(series) {
+  if (!state.oneshow.pin) return '<p class="muted small">点击曲线上的记录点，可查看数值、日期与来源。</p>';
+  const [key, d] = state.oneshow.pin.split('|');
+  const x = series.find(s => s.key === key);
+  const p = x && x.points.find(q => q.d === d);
+  if (!p) return '<p class="muted small">这个记录点已不在当前时间窗内。</p>';
+  return `<div class="pinbox"><div><b>${esc(x.name)} ${p.v} ${esc(x.unit)}</b>
+    <p class="muted" style="margin:2px 0">${p.d} · 来源：${esc(p.src)}</p>
+    <p class="muted small" style="margin:2px 0">趋势只用于回顾记录，不构成诊断或疗效判断。</p></div>
+    <button class="soft" data-action="oc-unpin">收起</button></div>`;
+}
+function oneshowMultiChart(series) {
+  const sel = series.filter(x => state.oneshow.sel.includes(x.key));
+  const [t0, t1] = oneshowDomain();
+  if (!sel.length) return emptyBox('还没有选择指标', '在左侧勾选最多 4 个指标，图表立即更新。');
+  const withPts = sel.map(x => ({ ...x, pts: x.points.filter(p => { const t = Date.parse(p.d); return t >= t0 && t <= t1; }) })).filter(x => x.pts.length);
+  if (!withPts.length) return emptyBox('所选指标在这个时间窗里没有记录', '扩大时间范围，或在左侧换选一个指标。');
+  const w = 900, h = 340, pad = { l: 30, r: 20, t: 26, b: 46 };
+  const X = d => pad.l + (Date.parse(d) - t0) / Math.max(t1 - t0, 1) * (w - pad.l - pad.r);
+  let out = '';
+  /* 治疗色带：中性背景（档案事实标注，不是判读） */
+  if (state.oneshow.toggles.treatment) {
+    for (const c of D.cycles) {
+      const x1 = X(c.start), x2 = X(c.end || c.start);
+      out += `<rect x="${x1.toFixed(1)}" y="${pad.t - 10}" width="${Math.max(x2 - x1, 3).toFixed(1)}" height="${h - pad.t - pad.b + 14}" fill="#9db8a8" opacity="0.16"><title>第${c.no}疗 ${c.start} → ${c.end}（档案事实标注，不是判读）</title></rect>`;
+    }
+  }
+  for (const x of withPts) {
+    const vs = x.pts.map(p => p.v);
+    const lo = Math.min(...vs), hi = Math.max(...vs), span = hi - lo || Math.max(Math.abs(hi) * 0.08, 1);
+    const Y = v => h - pad.b - (v - lo) / span * (h - pad.t - pad.b);
+    const coords = x.pts.map(p => ({ x: X(p.d), y: Y(p.v) }));
+    out += `<path class="line" d="${smoothPath(coords)}" pathLength="1" style="stroke:${x.color}"/>`;
+    coords.forEach((c, i) => {
+      const p = x.pts[i], prev = x.pts[i - 1];
+      let tag = '';
+      if (prev && state.oneshow.toggles.changes && Math.abs((p.v - prev.v) / Math.max(Math.abs(prev.v), 1)) >= 0.2) {
+        const pct = Math.round((p.v - prev.v) / Math.abs(prev.v) * 100);
+        tag += `<text x="${(c.x + 6).toFixed(1)}" y="${(c.y - 7).toFixed(1)}" fill="${x.color}" font-size="10">${pct > 0 ? '+' : ''}${pct}%</text>`;
+      }
+      if (i === coords.length - 1 && state.oneshow.toggles.keypoints) tag += `<text x="${(c.x - 5).toFixed(1)}" y="${(c.y - 9).toFixed(1)}" text-anchor="end" fill="${x.color}" font-size="10.5" style="font-weight:600">${p.v}</text>`;
+      out += `<circle class="pt" data-action="oc-pin" data-arg="${x.key}|${p.d}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="${x.color}" style="cursor:pointer"><title>${esc(x.name)} ${p.v} ${esc(x.unit)} · ${p.d} · ${esc(p.src)}</title></circle>${tag}`;
+    });
+  }
+  const months = []; const cur = new Date(t0); cur.setDate(1);
+  while (cur.getTime() <= t1) { if (cur.getTime() >= t0) months.push({ x: X(cur.toISOString().slice(0, 10)), l: cur.getFullYear() + '.' + (cur.getMonth() + 1) }); cur.setMonth(cur.getMonth() + 1); }
+  out += months.filter((m, i) => months.length > 10 ? i % 2 === 0 : true).map(m => `<text class="tick" x="${m.x.toFixed(1)}" y="${h - 18}" text-anchor="middle">${m.l}</text>`).join('');
+  out += `<text class="tick" x="${w - pad.r}" y="${h - 3}" text-anchor="end">每条线按该指标全部记录范围缩放，不代表不同指标数值可比</text>`;
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="已选 ${withPts.length} 个指标趋势；每条线按自身范围绘制，点选记录点可查看数值与来源">${out}</svg>`;
 }
 
 /* ---------------- 营养支持 ---------------- */
@@ -896,7 +1058,7 @@ function vMind() {
 }
 
 /* ---------------- 临床研究（登记摘录 + 三档匹配，MATCHING-SPEC §4） ---------------- */
-/* 入组档案（GTN 版）：全部来自既有病情数据，本页只读不录；缺失字段 → 对应规则「无法判定」，不阻断。 */
+/* 入组档案（GTN 版）：全部来自既有病情数据，本页只读不录；缺失字段 → 对应条件「无法自动匹配」，不阻断（35 号）。 */
 function matchProfileFields() {
   const first = D.hcg.points[0];
   const ct = D.pathology.find((x) => !x.src.includes('病理'));
@@ -914,43 +1076,56 @@ function matchProfileFields() {
   ];
 }
 
-/* 三档固定文案（中性色，不用红绿给试验排名；顺序固定：可能冲突 → 无法判定 → 已满足）。 */
-const TIER_LABEL = { conflict: '可能冲突', undetermined: '无法判定', satisfied: '已满足' };
-const TIER_MARK = { conflict: '⚠️', undetermined: '❓', satisfied: '✅' };
+/* 35 号分层文案：命中三分层 + 无法自动匹配；不产出满足/不适合类结论。 */
+const LAYER_LABEL = { structured: '结构化命中', text: '文本命中', broad: '宽口径命中' };
+const LAYER_MARK = { structured: '◆', text: '▪', broad: '○' };
 
 /* AI 协助匹配的预写提示词（gtn:agent-draft 契约：只放进输入框，不自动发送）。 */
 function matchPrompt() {
   const fields = matchProfileFields();
   const summary = fields.map((f) => `${f.k}：${f.v || '未记录'}`).join('；');
   const ids = D.trials.items.map((i) => i.recordId).join(' / ');
-  return `请协助我把入组档案与 ${D.trials.items.length} 条登记研究逐条比对。档案摘要——${summary}。试验列表——${ids}。要求：只用「已满足 / 可能冲突 / 无法判定」三档逐条列出，每条写清「你的记录」与来源；缺失字段一律判「无法判定」；不输出匹配度百分比、不排序、不写哪条更适合我；三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心。`;
+  return `请协助我把入组档案与 ${D.trials.items.length} 条登记研究逐条比对。档案摘要——${summary}。试验列表——${ids}。要求：按「结构化命中 / 文本命中 / 宽口径命中 / 无法自动匹配」分层列出，每条写清命中条件原文、你的记录与来源；本地无对应结构化字段的条件逐条标「无法自动匹配」并写原因；不输出数值综合分、不排序、不写哪条更适合我、不写「你不适合/你能入组」；入组判断属于医生与研究中心。`;
 }
 
-/* 单条试验的匹配结果卡：汇总行只计数；分组每条含「你的记录」与来源；卡脚固定句。 */
+/* 单条试验的分层结果卡（35 号三态：命中分层陈列 + 无法自动匹配列原因；宽口径排末尾）。 */
 function matchResultCard(e) {
   const item = D.trials.items.find((t) => t.recordId === e.recordId);
-  const by = { conflict: [], undetermined: [], satisfied: [] };
-  for (const r of e.rules) if (by[r.tier]) by[r.tier].push(r);
-  const group = (t) => by[t].length
-    ? `<div class="subhead">${TIER_MARK[t]} ${TIER_LABEL[t]}</div>` + by[t].map((r) =>
-      `<div class="row"><div class="row-main"><div><b>${esc(r.text)}</b><p>你的记录：${esc(r.mine)} · 来源：${esc(r.src)}</p></div></div></div>`).join('')
-    : '';
+  const hits = e.rules.filter((r) => r.tier === 'satisfied' || r.tier === 'conflict');
+  const order = { structured: 0, text: 1, broad: 2 };
+  const sorted = hits.slice().sort((a, b) => (order[a.layer] ?? 3) - (order[b.layer] ?? 3));
+  const unmatched = e.rules.filter((r) => r.tier === 'undetermined');
+  const layerBadge = (r) => `<span class="pill${r.layer === 'broad' ? ' grey' : ''}" title="${LAYER_LABEL[r.layer] || '命中'}">${LAYER_MARK[r.layer] || '·'} ${LAYER_LABEL[r.layer] || '命中'}</span>`;
+  const hitRow = (r) => `<div class="row"><div class="row-main"><div><b>${esc(r.text)}${r.tier === 'conflict' ? '<em class="muted">（你的记录与条件数值不同——如实陈列，核实请与研究方）</em>' : ''}</b>
+    <p>你的记录：${esc(r.mine)} · 来源：${esc(r.src)}</p></div>${layerBadge(r)}</div></div>`;
+  const unRow = (r) => `<div class="row"><div class="row-main"><div><b>${esc(r.text)}</b><p>无法自动匹配：${esc(r.mine)}</p></div><span class="pill grey">无法自动匹配</span></div></div>`;
   const fav = state.trialFavs.has(e.recordId);
+  const nl = { structured: hits.filter(r => r.layer === 'structured').length, text: hits.filter(r => r.layer === 'text').length, broad: hits.filter(r => r.layer === 'broad').length };
   return `<div class="cand">
     <div class="cand-head"><b>${esc(item ? item.title : e.recordId)}</b>
       <div class="head-actions"><button class="chip${fav ? ' on' : ''}" data-action="trial-fav" data-arg="${esc(e.recordId)}" aria-pressed="${fav}">☆ 收藏</button></div></div>
-    <p class="muted">已满足 ${by.satisfied.length} 项 · 可能冲突 ${by.conflict.length} 项 · 无法判定 ${by.undetermined.length} 项 · 待确认规则 ${e.pending.length} 项（汇总只计数，不给匹配度）</p>
-    ${group('conflict')}${group('undetermined')}${group('satisfied')}
-    ${e.pending.length ? `<div class="subhead">⏳ 待确认规则（不进三档统计）</div>${e.pending.map((p) => `<div class="row"><div class="row-main"><div><b>${esc(p)}</b></div></div></div>`).join('')}` : ''}
+    <p class="muted">命中 ${hits.length} 项（结构化 ${nl.structured} · 文本 ${nl.text} · 宽口径 ${nl.broad}，宽口径排末尾）· 无法自动匹配 ${unmatched.length} 项 · 待确认规则 ${e.pending.length} 项——只陈列证据链，不给综合分、不排序择优</p>
+    <div class="subhead">命中（分层陈列：条件原文 + 你的记录 + 来源）</div>
+    ${sorted.map(hitRow).join('') || '<p class="muted small">（无命中条目）</p>'}
+    <div class="subhead">无法自动匹配（本地无对应结构化字段，逐条列原因）</div>
+    ${unmatched.map(unRow).join('') || '<p class="muted small">（全部条件均已比对）</p>'}
+    ${e.pending.length ? `<div class="subhead">⏳ 待确认规则（不进统计）</div>${e.pending.map((p) => `<div class="row"><div class="row-main"><div><b>${esc(p)}</b></div></div></div>`).join('')}` : ''}
     <p class="muted small">${esc(D.match.footerNote)}</p>
-    <p class="muted small">登记号 ${esc(e.recordId)} · 排序按数据来源顺序，不按匹配度 · 评估生成 ${esc(D.match.generatedAt)}（档案 ${esc(D.match.profileRevision)} · 规则集 ${esc(D.match.ruleSetVersion)}）</p>
+    <p class="muted small">登记号 ${esc(e.recordId)} · 来源通道与终态：${esc(D.match.channelsNote)} · 排序按数据来源顺序，不按命中程度</p>
+    <p class="muted small">登记状态，未核实 · 登记状态 ≠ 有效 ≠ 可入组</p>
   </div>`;
 }
-
 function vTrials() {
+  const sub = state.trialSub || 'match';
+  const subBtn = ([k, l]) => `<button class="chip${sub === k ? ' on' : ''}" data-action="trial-sub" data-arg="${k}" aria-pressed="${sub === k}">${l}</button>`;
+  return `${pageHead('trials')}
+  <div class="notice">${esc(D.trials.disclaimer)}</div>
+  <div class="chip-row" role="tablist" aria-label="临床研究子页">${subBtn(['match', '匹配'])}${subBtn(['search', '检索'])}${subBtn(['follow', '收藏跟踪'])}</div>
+  ${sub === 'match' ? vTrialsMatch() : sub === 'search' ? vTrialsSearch() : vTrialsFollow()}`;
+}
+
+function vTrialsMatch() {
   const t = D.trials;
-  const fields = matchProfileFields();
-  const missing = fields.filter((f) => !f.v);
   const filters = [
     ['all', `全部来源（${t.items.length}）`],
     ['chinadrugtrials', '中国药物临床试验登记平台'],
@@ -959,11 +1134,11 @@ function vTrials() {
   const list = state.trialFilter === 'all' ? t.items
     : state.trialFilter === 'chinadrugtrials' ? t.items.filter(i => i.source.includes('登记平台'))
     : [];
-  return `${pageHead('trials')}
-  <div class="notice">${esc(t.disclaimer)}</div>
-  <div class="card"><div class="card-head"><h2>入组档案（不重复录入）</h2><span class="muted">完整度 ${fields.length - missing.length}/${fields.length} · 全部来自既有病情数据</span></div>
-    <div class="notice">缺失不阻断匹配，但对应条件会判「无法判定」${missing.length ? '，当前缺失：' + missing.map((f) => esc(f.k)).join(' · ') : ''}。</div>
-    <div class="rows">${fields.map((f) => row(esc(f.k), f.v ? `${esc(f.v)} · 来源：${esc(f.src)}` : '<b>未记录</b>——对应条件将判「无法判定」')).join('')}</div>
+  const fields = matchProfileFields();
+  const missing = fields.filter((f) => !f.v);
+  return `<div class="card"><div class="card-head"><h2>入组档案（不重复录入）</h2><span class="muted">完整度 ${fields.length - missing.length}/${fields.length} · 全部来自既有病情数据</span></div>
+    <div class="notice">缺失不阻断匹配，但对应条件为「无法自动匹配」${missing.length ? '，当前缺失：' + missing.map((f) => esc(f.k)).join(' · ') : ''}。</div>
+    <div class="rows">${fields.map((f) => row(esc(f.k), f.v ? `${esc(f.v)} · 来源：${esc(f.src)}` : '<b>未记录</b>——对应条件为「无法自动匹配」')).join('')}</div>
     <p class="muted small">年龄 / 末次妊娠 / FIGO 八项 / 化疗方案等已在诊断与治疗页维护，这里只读不录；补充字段请回对应业务页录入。</p>
   </div>
   <div class="card"><div class="card-head"><h2>检索双通道</h2><span class="muted">自带库 6 条 · AI 协助只起草不代发</span></div>
@@ -985,11 +1160,53 @@ function vTrials() {
     </div>`).join('') : emptyBox('没有匹配的登记条目', '换一个来源筛选试试；「其它来源」在当前快照里为空，如实显示空态。')}
   </div>
   <div class="card"><div class="card-head"><h2>匹配结果（三档 · 固定格式）</h2><span class="muted">确定性规则求值 · 排序按数据来源顺序</span></div>
-    <div class="notice">每张卡按「已满足 / 可能冲突 / 无法判定 / 待确认规则」计数并列出每条的「你的记录」与来源；不输出匹配度百分比、不排序、不代为挑选试验。${esc(D.match.channelsNote)}</div>
+    <div class="notice">每张卡按「结构化命中 / 文本命中 / 宽口径命中 / 无法自动匹配」分层陈列条件原文、你的记录与来源；不输出数值综合分、不排序择优、不写「你不适合/你能入组」。${esc(D.match.channelsNote)}</div>
     <div class="rows">${D.match.entries.map(matchResultCard).join('')}</div>
     <p class="muted small">${esc(D.match.footerNote)}</p>
   </div>
   ${agentPane(matchPrompt())}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+/* 检索子页：筛条件（试验特征），与「匹配」（用你的记录）分开——biliary 式结构。 */
+function vTrialsSearch() {
+  const t = D.trials;
+  const scene = state.trialScene || 'all';
+  const statusF = state.trialStatus || 'all';
+  const bySource = state.trialFilter || 'all';
+  let list = t.items;
+  if (bySource === 'chinadrugtrials') list = list.filter(i => i.source.includes('登记平台'));
+  else if (bySource === 'other') list = [];
+  const scenes = [['all', '不限'], ['chemo', '化疗期语境'], ['followup', '随访期语境']];
+  const statuses = [['all', '不限状态'], ...[...new Set(t.items.map(i => i.status))].map(x => [x, x])];
+  return `<div class="card"><div class="card-head"><h2>筛条件</h2><span class="muted">试验特征筛选；「与我相关」的判断在「匹配」子页，两者分开</span></div>
+    <div class="chip-row" role="group" aria-label="治疗场景">${scenes.map(([k, l]) => `<button class="chip${scene === k ? ' on' : ''}" data-action="trial-scene" data-arg="${k}" aria-pressed="${scene === k}">${l}</button>`).join('')}</div>
+    <div class="chip-row" role="group" aria-label="登记状态">${statuses.map(([k, l]) => `<button class="chip${statusF === k ? ' on' : ''}" data-action="trial-statusf" data-arg="${esc(k)}" aria-pressed="${statusF === k}">${esc(l)}</button>`).join('')}</div>
+    <div class="chip-row" role="group" aria-label="按来源筛选">${[['all', '全部来源'], ['chinadrugtrials', '中国药物临床试验登记平台'], ['other', '其它来源（演示空态）']].map(([k, l]) => `<button class="chip${bySource === k ? ' on' : ''}" data-action="trial-filter" data-arg="${k}" aria-pressed="${bySource === k}">${l}</button>`).join('')}</div>
+    <div class="rows">${list.length ? list.map(i => `<div class="cand">
+      <div class="cand-head"><b>${esc(i.title)}</b>${pill(i.status, 'yellow')}</div>
+      <div class="cand-fields"><span><i>登记号</i><b>${esc(i.recordId)}</b></span><span><i>申办方</i><b>${esc(i.sponsor)}</b></span><span><i>来源</i><b>${esc(i.source)}</b></span></div>
+      <p class="muted small">登记 ≠ 有效 ≠ 可入组；详情以登记平台原文为准：${esc(i.url)}</p>
+    </div>`).join('') : emptyBox('没有匹配的登记条目', '换一组筛选试试；「其它来源」在当前快照里为空，如实显示空态。')}</div>
+    <p class="muted small">检索只按条目本身筛选；「与我相关」的判断在匹配子页，用的是你的当前记录——两者分开，是为了让你能看见「与我无关但存在」的选项。</p>
+  </div>
+  ${agentPane('请帮我把检索子页的试验按登记状态整理成清单（登记号 / 标题 / 状态 / 来源），保持原文不改写，不加任何入组相关判断。')}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+/* 收藏跟踪子页：跟踪「试验变了什么」，不是「我该不该进」。 */
+function vTrialsFollow() {
+  const favs = [...state.trialFavs];
+  const items = favs.map(id => D.trials.items.find(i => i.recordId === id)).filter(Boolean);
+  const entries = favs.map(id => D.match.entries.find(e => e.recordId === id)).filter(Boolean);
+  return `<div class="card"><div class="card-head"><h2>收藏与跟踪（${favs.length}）</h2><span class="muted">跟踪的是「试验变了什么」，不是「我该不该进」</span></div>
+    ${items.length ? `<div class="rows">${items.map((i, n) => row(`${esc(i.recordId)} · ${esc(i.title)}`,
+      `状态：${esc(i.status)} · 来源：${esc(i.source)} · 快照 2026-10-25；${entries[n] ? `最近分层评估 ${esc(D.match.generatedAt.slice(0, 10))}（档案 ${esc(D.match.profileRevision)}）` : '尚未评估'}；登记状态有变时以平台原文为准，本页不自动推送`,
+      pill('跟踪中', 'grey'))).join('')}</div>
+    <p class="muted small">快照会过期：状态与条件以登记平台当前原文为准；重新运行 fetch-gtn-trials-2026 可刷新本地快照（终端态如实）。</p>`
+    : emptyBox('还没有收藏的试验', '在「匹配」子页点 ☆ 收藏，这里才会出现跟踪线。')}
+  </div>
+  ${agentPane('请帮我把收藏的试验整理成复诊时要问的研究问题清单（登记号 / 我想问什么），只整理问题不写答案，不做任何入组判断。')}
   ${quoteLine(QUOTE.none)}`;
 }
 
@@ -1329,6 +1546,13 @@ const actions = {
   },
   /* 临床研究 */
   'trial-filter'(el) { state.trialFilter = el.dataset.arg; render(); },
+  'trial-sub'(el) { state.trialSub = el.dataset.arg; render(); },
+  'trial-scene'(el) { state.trialScene = el.dataset.arg; render(); },
+  'trial-statusf'(el) { state.trialStatus = el.dataset.arg; render(); },
+  'oc-range'(el) { state.oneshow.range = el.dataset.arg; render(); },
+  'oc-toggle'(el) { const k = el.dataset.arg; state.oneshow.toggles[k] = !state.oneshow.toggles[k]; render(); },
+  'oc-pin'(el) { if (el.dataset.arg) { state.oneshow.pin = el.dataset.arg; render(); } },
+  'oc-unpin'() { state.oneshow.pin = null; render(); },
   'trial-fav'(el) {
     const id = el.dataset.arg;
     if (state.trialFavs.has(id)) state.trialFavs.delete(id);
@@ -1366,6 +1590,13 @@ document.addEventListener('click', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-review]');
   if (el) { state.reviewSel[el.dataset.review] = el.checked; }
+  const oc = e.target.closest('input[data-oc-metric]');
+  if (oc) {
+    const id = oc.dataset.ocMetric;
+    if (oc.checked) { if (state.oneshow.sel.length >= 4) { oc.checked = false; toast('最多同时看 4 个指标，先取消一个再选。'); return; } if (!state.oneshow.sel.includes(id)) state.oneshow.sel.push(id); }
+    else state.oneshow.sel = state.oneshow.sel.filter(x => x !== id);
+    state.oneshow.pin = null; render();
+  }
 });
 document.addEventListener('click', (e) => {
   const kp = e.target.closest('[data-keypad]');

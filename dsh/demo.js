@@ -215,7 +215,7 @@ export function seedDemo(db, input) {
       for (const r of e.rules) {
         const meta = ruleMeta(r.text);
         const res = insRule.run(e.recordId, r.text, meta.field, meta.type, j(meta.cond), 0, ord++);
-        judgments[String(Number(res.lastInsertRowid))] = { tier: r.tier, mine: r.mine, src: r.src };
+        judgments[String(Number(res.lastInsertRowid))] = { tier: r.tier, layer: r.layer ?? null, mine: r.mine, src: r.src };  // layer：35 号分层（structured/text/broad）
       }
       for (const p of e.pending) {
         const meta = ruleMeta(p);

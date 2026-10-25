@@ -76,6 +76,15 @@
 ![和 AI 讨论](docs/screenshots/readme-discuss-0.7.0.png)
 每页标题行「和 AI 讨论」按钮：点击拉起 AI 对话栏并携带本页关键信息（最近 hCG/疗程/随访月等事实摘要）进输入框——只填不发，确认后由你点「发送」（IP10 守卫）；顶栏五态开关负责随时拉起/隐藏对话栏；疾病概要弹窗内置「和 AI 讨论这个概要」。
 
+
+### 一图秀 · rail 式多指标趋势（v0.8.0，对齐乳腺癌风格）
+![一图秀 rail](docs/screenshots/readme-oneshow-rail-0.8.0.png)
+左栏：时间范围 chips + 分组指标勾选（≤4，即时更新）+ 显示开关；每条线按自身全部记录范围缩放；图例带全期区间；点选记录点 pin 数值/日期/来源；疗程色带为档案事实标注。
+
+### 临床研究 · 分层命中三子页（35 号，参考 biliary-tract 结构）
+![临床研究](docs/screenshots/readme-trials-35-0.8.0.png)
+匹配（结构化/文本/宽口径命中分层陈列条件原文+你的记录+来源；无法自动匹配逐条列原因）/ 检索（筛条件与"与我相关"分开）/ 收藏跟踪（跟踪"试验变了什么"）；无数值综合分；snapshotDate 与通道终态透传；登记 ≠ 有效 ≠ 可入组。
+
 ## 怎么用
 
 原型：直接打开 `public/index.html`（或 `python3 -m http.server` 后访问），全部为演示数据。
@@ -96,4 +105,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.7.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.8.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

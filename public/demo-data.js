@@ -163,58 +163,58 @@ window.DEMO_DATA = {
   },
   /* 临床研究匹配（MATCHING-SPEC §4 三档算法，GTN 语境化演示）：
      规则求值是确定性规则求值（同样档案 + 同样规则版本 = 同样结果），不调用模型判定；
-     三档枚举 tier: satisfied 已满足 / conflict 可能冲突 / undetermined 无法判定；
-     缺失永远流向无法判定；排序按数据来源顺序（trials ord），不按匹配度；
+     tier 枚举（存储层沿用 0004）：satisfied/conflict=命中（呈现层分结构化/文本/宽口径三层）；undetermined=无法自动匹配；
+     缺失永远流向「无法自动匹配」；排序按数据来源顺序（trials ord），不按命中程度（35 号）；
      待确认规则（pending）不进三档统计，单列一档。禁用百分比数字与一切倾向性排序/择优措辞。 */
   match: {
     profileRevision: 'rev-20261025-1',
     ruleSetVersion: 'gtn-match-rules-20261025',
     generatedAt: '2026-10-25T10:00:00+08:00',
-    footerNote: '三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心。',
-    channelsNote: '检索双通道：①自带库（登记摘录 6 条，快照 2026-10-25）；②AI 协助匹配（只起草提示词，不自动发送）。外部检索通道：脚本 fetch-gtn-trials-2026（终端态如实：需在终端手动运行，本页不代跑）。',
+    footerNote: '分层命中只陈列「条件原文 + 你的记录 + 来源」；无法自动匹配=本地无对应结构化字段。入组判断属于医生与研究中心，工作台不产出「你不适合/你能入组」。',
+    channelsNote: '检索双通道：①本地快照（登记摘录 6 条，snapshotDate 2026-10-25，快照会过期）；②unified-trial-mcp 在线通道（终态透传：chinadrugtrials SUCCESS；ictrp FAILED；chictr_online NOT_ENABLED；ctv NEEDS_SETUP——FAILED/未启用不算「查过」）。AI 协助匹配只起草提示词，不代发。',
     entries: [
       { recordId: 'CTR20192427', pending: ['试验期间需采取避孕措施（登记原文未结构化，待确认）'],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN），已行 MTX 化疗 3 疗', src: '病理摘录 · 治疗记录' },
-          { text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16，序列首点）', src: 'hCG 时间线' },
-          { text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '出院小结有肝肾功能报告（2026-06-10），逐项数值未入档', src: '资料档案' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'broad', text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN），已行 MTX 化疗 3 疗', src: '病理摘录 · 治疗记录' },
+          { layer: 'structured', text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16，序列首点）', src: 'hCG 时间线' },
+          { layer: 'text', text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '出院小结有肝肾功能报告（2026-06-10），逐项数值未入档', src: '资料档案' }
         ] },
       { recordId: 'CTR20220792', pending: [],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '排除妊娠期或滋养细胞疾病患者（登记原文）', tier: 'conflict', mine: '末次妊娠为完全性葡萄胎（GTN），2026-03-12 清宫', src: '末次妊娠档案' },
-          { text: '既往化疗线数 ≤1', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗，2026-04-20 → 06-19）', src: '治疗记录' },
-          { text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '逐项数值未入档，无法比对', src: '资料档案' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'structured', text: '排除妊娠期或滋养细胞疾病患者（登记原文）', tier: 'conflict', mine: '末次妊娠为完全性葡萄胎（GTN），2026-03-12 清宫', src: '末次妊娠档案' },
+          { layer: 'structured', text: '既往化疗线数 ≤1', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗，2026-04-20 → 06-19）', src: '治疗记录' },
+          { layer: 'text', text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '逐项数值未入档，无法比对', src: '资料档案' }
         ] },
       { recordId: 'CTR20222562', pending: [],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN）', src: '病理摘录' },
-          { text: '能规律随访（试验要求按时访视）', tier: 'undetermined', mine: '未记录能否按试验节奏规律随访（other 类型规则，保留原文）', src: '（无对应记录）' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'broad', text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN）', src: '病理摘录' },
+          { layer: 'broad', text: '能规律随访（试验要求按时访视）', tier: 'undetermined', mine: '未记录能否按试验节奏规律随访（other 类型规则，保留原文）', src: '（无对应记录）' }
         ] },
       { recordId: 'CTR20222621', pending: [],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16）', src: 'hCG 时间线' },
-          { text: '既往化疗线数 ≤2', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
-          { text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN），已行化疗', src: '病理摘录 · 治疗记录' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'structured', text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16）', src: 'hCG 时间线' },
+          { layer: 'structured', text: '既往化疗线数 ≤2', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
+          { layer: 'broad', text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN），已行化疗', src: '病理摘录 · 治疗记录' }
         ] },
       { recordId: 'CTR20252681', pending: [],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '经病理确诊的滋养细胞肿瘤', tier: 'satisfied', mine: '宫腔刮出物病理（2026-03-13）：「绒毛弥漫水肿，滋养细胞轻至中度增生」（原文摘录）', src: '病理摘录' },
-          { text: '复发性/难治性绒毛膜癌受试者（登记原文，未能结构化）', tier: 'undetermined', mine: '档案记录为完全性葡萄胎化疗后随访中；是否属本试验目标人群，现有记录不足以判断', src: '（other 类型规则，需研究中心核实）' },
-          { text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16）', src: 'hCG 时间线' },
-          { text: '既往化疗线数 ≤2', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
-          { text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '逐项数值未入档，无法比对', src: '资料档案' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'structured', text: '经病理确诊的滋养细胞肿瘤', tier: 'satisfied', mine: '宫腔刮出物病理（2026-03-13）：「绒毛弥漫水肿，滋养细胞轻至中度增生」（原文摘录）', src: '病理摘录' },
+          { layer: 'broad', text: '复发性/难治性绒毛膜癌受试者（登记原文，未能结构化）', tier: 'undetermined', mine: '档案记录为完全性葡萄胎化疗后随访中；是否属本试验目标人群，现有记录不足以判断', src: '（other 类型规则，需研究中心核实）' },
+          { layer: 'structured', text: '治疗前血 hCG < 100000 IU/L', tier: 'satisfied', mine: '98700 IU/L（2026-03-16）', src: 'hCG 时间线' },
+          { layer: 'structured', text: '既往化疗线数 ≤2', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
+          { layer: 'text', text: '肝功能指标在参考范围内', tier: 'undetermined', mine: '逐项数值未入档，无法比对', src: '资料档案' }
         ] },
       { recordId: 'CTR20263587', pending: [],
         rules: [
-          { text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
-          { text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN）', src: '病理摘录' },
-          { text: '既往化疗线数 ≤1', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
-          { text: '能规律随访（试验要求按时访视）', tier: 'undetermined', mine: '未记录随访安排（other 类型规则，保留原文）', src: '（无对应记录）' }
+          { layer: 'structured', text: '年龄 ≥18 岁', tier: 'satisfied', mine: '29 岁', src: '患者档案' },
+          { layer: 'broad', text: '健康受试者（无活动性疾病）', tier: 'conflict', mine: '病理记录：完全性葡萄胎（GTN）', src: '病理摘录' },
+          { layer: 'structured', text: '既往化疗线数 ≤1', tier: 'satisfied', mine: '1 线（MTX 单药 × 3 疗）', src: '治疗记录' },
+          { layer: 'broad', text: '能规律随访（试验要求按时访视）', tier: 'undetermined', mine: '未记录随访安排（other 类型规则，保留原文）', src: '（无对应记录）' }
         ] }
     ]
   },

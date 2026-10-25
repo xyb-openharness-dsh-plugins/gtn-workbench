@@ -332,3 +332,16 @@ svg.chart.metric-chart { min-width: 640px; }
 .head-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .discuss-btn { border: 1px solid var(--accent, #8a5a44); background: transparent; color: var(--accent, #8a5a44); border-radius: 13px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .discuss-btn:hover, .discuss-btn:focus-visible { background: var(--accent, #8a5a44); color: #fff; }
+
+/* 一图秀 rail（breast 口径）：左栏筛选 + 主区趋势 + pin */
+.one-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .one-grid { grid-template-columns: 1fr; } }
+.rail { background: #fff; border: 1px solid var(--line, #eee); border-radius: 12px; padding: 12px; }
+.rail section { margin-bottom: 14px; }
+.rail h3 { font-size: 13px; margin: 0 0 8px; }
+.rail .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-label { font-size: 12.5px; color: var(--ink-2, #6f6a66); margin: 8px 0 4px; font-weight: 600; }
+.metric-pick { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 2px; cursor: pointer; }
+.metric-pick i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.metric-pick small { margin-left: auto; color: var(--ink-2, #6f6a66); }
+.pinbox { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line, #eee); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }

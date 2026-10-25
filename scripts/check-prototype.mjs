@@ -156,12 +156,14 @@ check('nutrition-mind-data',
 check('oneshow-chart', /function oneshowChart/.test(app) && /清宫/.test(app) && /达正常锚点（你勾选）/.test(app), {});
 /* ---------- v0.4.0 新增：临床研究三档匹配表达约束（MATCHING-SPEC §4.4） ---------- */
 check('match-three-tiers',
-  /已满足/.test(app) && /可能冲突/.test(app) && /无法判定/.test(app) && /待确认规则/.test(app)
+  /结构化命中/.test(app) && /文本命中/.test(app) && /宽口径命中/.test(app) && /无法自动匹配/.test(app) && /待确认规则/.test(app)
   && /satisfied/.test(data) && /conflict/.test(data) && /undetermined/.test(data), {});
-check('match-summary-line', /已满足 \$\{/.test(app) && /待确认规则 \$\{e\.pending\.length\} 项/.test(app)
-  && /汇总只计数，不给匹配度/.test(app), {});
-check('match-footer-sentence', app.includes('三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心')
-  && data.includes('三档只说明记录与登记条件的比对结果，入组判断属于医生与研究中心'), {});
+check('match-summary-line', /命中 \$\{hits\.length\} 项/.test(app) && /无法自动匹配 \$\{unmatched\.length\} 项/.test(app)
+  && /只陈列证据链，不给综合分、不排序择优/.test(app), {});
+check('match-footer-sentence', app.includes('D.match.footerNote') && app.includes('登记状态，未核实')
+  && app.includes('登记状态 ≠ 有效 ≠ 可入组')
+  && data.includes('分层命中只陈列「条件原文 + 你的记录 + 来源」')
+  && data.includes('snapshotDate 2026-10-25'), {});
 /* 禁：匹配度百分比 / 高匹配 / 推荐试验（app + demo 自写文案与 HTML；recordId 行豁免同上） */
 check('match-no-percent', !/匹配度\s*[%％]|\d+\s*%.*匹配|percent/.test(app) && !/匹配度\s*[%％]/.test(dataExExcerpt) && !/高匹配/.test(app) && !/高匹配/.test(dataExExcerpt), {});
 check('match-no-recommend', !/推荐/.test(app) && !/推荐/.test(dataExExcerpt) && !/推荐/.test(html), {});
@@ -173,8 +175,9 @@ const trialsOrderReal = [...itemsBlock.matchAll(/recordId: '(CTR\d+)'/g)].map((m
 check('match-source-order', matchOrder.length === 6 && JSON.stringify(matchOrder) === JSON.stringify(trialsOrderReal), { matchOrder, trialsOrder: trialsOrderReal });
 /* 档案完整度 + 缺失→无法判定 不阻断 */
 check('match-profile-completeness', /完整度 \$\{fields\.length - missing\.length\}\/\$\{fields\.length\}/.test(app)
-  && /缺失不阻断匹配/.test(app) && /对应条件将判「无法判定」/.test(app), {});
+  && /缺失不阻断匹配/.test(app) && /无法自动匹配/.test(app), {});
 /* 检索双通道 + AI 只起草不代发 + 外部通道如实声明 */
+check('trial-subtabs', /trial-sub/.test(app) && app.includes('收藏跟踪') && app.includes('跟踪的是「试验变了什么」') && app.includes('筛条件') && app.includes('两者分开'), {});
 check('match-dual-channel', /检索双通道/.test(app) && /自带库检索/.test(app) && /AI 协助匹配/.test(app)
   && /fetch-gtn-trials-2026/.test(app) && /unified-trial-mcp/.test(app) && /终端态如实/.test(app), {});
 /* demo 三档都齐：至少 1 条可能冲突 + 至少 2 条无法判定 + 至少 1 条待确认 */

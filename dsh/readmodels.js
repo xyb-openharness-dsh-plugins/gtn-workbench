@@ -135,7 +135,7 @@ export function readMatch(db) {
         recordId: t.record_id,
         rules: rs.filter((r) => !r.pending).map((r) => {
           const j = jz[String(r.id)] ?? {};
-          return { text: r.rule_text, tier: j.tier ?? 'undetermined', mine: j.mine ?? null, src: j.src ?? null };
+          return { text: r.rule_text, tier: j.tier ?? 'undetermined', layer: j.layer ?? null, mine: j.mine ?? null, src: j.src ?? null };  // layer：35 号分层
         }),
         pending: rs.filter((r) => r.pending).map((r) => r.rule_text),
       };
