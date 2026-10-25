@@ -71,6 +71,11 @@
 ![指标管理](docs/screenshots/readme-metrics-manage-0.5.0.png)
 全部指标序列清单：序列名/单位/记录数/最近值+日期/迷你走势/来源，序列显隐设置、AI 导入候选（不代发）、「⋯ 更多」手工补录；更正=版本链。
 
+
+### 和 AI 讨论（v0.7.0，每页标配）
+![和 AI 讨论](docs/screenshots/readme-discuss-0.7.0.png)
+每页标题行「和 AI 讨论」按钮：点击拉起 AI 对话栏并携带本页关键信息（最近 hCG/疗程/随访月等事实摘要）进输入框——只填不发，确认后由你点「发送」（IP10 守卫）；顶栏五态开关负责随时拉起/隐藏对话栏；疾病概要弹窗内置「和 AI 讨论这个概要」。
+
 ## 怎么用
 
 原型：直接打开 `public/index.html`（或 `python3 -m http.server` 后访问），全部为演示数据。
@@ -91,4 +96,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.6.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.7.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

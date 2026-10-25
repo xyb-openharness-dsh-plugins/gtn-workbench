@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.6.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
+/* 小葡宝 GraPal v0.7.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
    视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.6.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.7.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -161,7 +161,33 @@ function pageHead(view) {
   /* 疾病概要 ? 入口（用户 2026-10-25 指令）：看板标题行右侧，四要素精炼概要 */
   const briefBtn = view === 'dashboard'
     ? `<button class="brief-btn" data-action="disease-brief" aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势" title="疾病概要">?</button>` : '';
-  return `<div class="page-head"><div><h1>${esc(p[1])}</h1><p>${esc(SUBTITLES[view])}</p></div>${briefBtn}</div>`;
+  /* 「和 AI 讨论」（脚手架标准）：点击拉起 AI 对话栏并携带本页关键信息进输入框（不代发，IP10 守卫同款） */
+  const discussBtn = `<button class="discuss-btn" data-action="discuss" aria-label="和 AI 讨论本页内容（拉起对话栏并携带本页关键信息）">和 AI 讨论</button>`;
+  return `<div class="page-head"><div><h1>${esc(p[1])}</h1><p>${esc(SUBTITLES[view])}</p></div><div class="head-actions">${briefBtn}${discussBtn}</div></div>`;
+}
+
+/* 本页关键信息（「和 AI 讨论」携带的上下文，事实陈述、无判定词）。 */
+function discussFacts() {
+  const last = D.hcg.points.filter(p => p.in_use !== false).at(-1) ?? D.hcg.points.at(-1);
+  const cycles = D.cycles.length;
+  const anchor = D.hcg.points.find(p => p.event === 'anchor');
+  const fm = D.followup.months.reduce((a, b) => (b.n > a.n ? b : a), D.followup.months[0]);
+  const base = `最近血 hCG ${last.v} ${D.hcg.unit}（${last.d}，${last.src}）；疗程记录 ${cycles} 个；${anchor ? `hCG 达正常锚点 ${anchor.d}（用户勾选）；` : ''}随访已记到第 ${fm.n} 个月。`;
+  const byView = {
+    dashboard: base,
+    hcg: base + `hCG 共 ${D.hcg.points.length} 条记录，事件标记 ${D.hcg.points.filter(p => p.event).length} 个（均由你勾选）。`,
+    treatment: `疗程 ${cycles} 个：${D.cycles.map(c => `第${c.no}疗 ${c.regimen} ${c.start}~${c.end ?? '进行中'}`).join('；')}。`,
+    diagnosis: `末次妊娠：${D.pregnancy.type ?? ''}；FIGO 评分 8 项照抄（总分读取时求和）。`,
+    followup: `随访锚点后已记录 ${D.followup.months.length} 个月；节奏出处可切换（NCCN 2.2026 / 中国 2021 / 我的医嘱）。`,
+    timeline: base,
+    nutrition: `体重最近 ${D.nutrition.weight.at(-1).v} kg（${D.nutrition.weight.at(-1).d}）；餐记录 ${D.nutrition.meals.length} 条。`,
+    mind: `情绪日记 ${D.mind.moods.length} 条；等报告日记录 ${D.mind.waitDays.length} 条（私密仅本机）。`,
+    trials: `试验库 6 条（登记状态，未核实）；三档匹配结果已生成。`,
+    import: `已入档 ${D.imports?.docs?.length ?? 0} 份；候选未核对不入事实层。`,
+    review: `复诊材料与档案同源（唯一数据源）。`,
+    settings: `资料目录/解析模式/临床参考数据包来源与版本。`,
+  };
+  return byView[state.view] ?? base;
 }
 
 /* 疾病概要（来源 docs/CLINICAL-DATA.md，只做整理性概要，不构成诊断或治疗建议）。 */
@@ -188,7 +214,7 @@ function diseaseBriefDialog() {
     <div class="brief-sec"><h3>目前治疗全景概要</h3><p>${esc(DISEASE_BRIEF.treat)}</p></div>
     <div class="brief-sec"><h3>发展趋势</h3><p>${esc(DISEASE_BRIEF.trend)}</p></div>
     <p class="muted">以上为公开资料的整理性概要，不构成诊断或治疗建议；版本与出处详见设置页与 docs/CLINICAL-DATA.md。</p>`,
-    '<button data-action="close">关闭</button>');
+    '<button class="soft" data-action="close">关闭</button><button data-action="discuss-brief">和 AI 讨论这个概要</button>');
 }
 
 /* AI 协助条：每个一级页至少一处 gtn:agent-draft 按钮。 */
@@ -1313,7 +1339,22 @@ const actions = {
   key(el) { keypadKey(el.dataset.k); },
   'key-ok'() { if (state.keypad && state.keypad.input) state.keypad.input.value = $('#keypad-screen').value; closeDialog(); },
   close() { closeDialog(); },
-  'disease-brief'() { diseaseBriefDialog(); }
+  'disease-brief'() { diseaseBriefDialog(); },
+  /* 「和 AI 讨论」：拉起对话栏 + 携带本页关键信息（填入不代发）；再次点击对话栏不收起（收起走顶栏五态开关） */
+  discuss() {
+    const draftBtn = document.querySelector('.agent-card [data-action="agent-draft"]');
+    const base = draftBtn ? draftBtn.dataset.prompt : '请帮我整理当前页面的记录。';
+    const title = (PAGES.find(x => x[0] === state.view) || [])[1] ?? '';
+    agentDraft(`【${title} · 本页关键信息】${discussFacts()}\n\n${base}`);
+    agentPaneApply('open');
+    document.querySelector('#agent-dock')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+  'discuss-brief'() {
+    closeDialog();
+    agentDraft(`【GTN 疾病概要 · 讨论】我正在看疾病概要：指南以 NCCN 2.2026 / FIGO 2000 评分 / 中华医学会 2021 为出处。请用通俗的话解释其中我不懂的部分（比如 FIGO 评分八个项目分别是什么意思），只做概念解释，不针对我的病情做任何判断。`);
+    agentPaneApply('open');
+    document.querySelector('#agent-dock')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 };
 
 document.addEventListener('click', (e) => {

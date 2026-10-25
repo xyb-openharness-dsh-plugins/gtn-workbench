@@ -123,6 +123,9 @@ check('more-menu-manual-entry', /⋯ 更多/.test(app), {});
 check('decimal-keypad', /inputmode="decimal"/.test(app) && /data-keypad/.test(app) && /keypad/.test(css), {});
 /* ---------- demo 数据完整性（林小葡旅程） ---------- */
 const pts = (data.match(/d: '\d{4}-\d{2}-\d{2}', v:/g) || []).length;
+check('discuss-every-page', app.includes('data-action="discuss"') && app.includes('aria-label="和 AI 讨论本页内容'), {});
+check('discuss-brief-in-dialog', app.includes('data-action="discuss-brief"') && app.includes('和 AI 讨论这个概要'), {});
+check('discuss-carries-facts', app.includes('discussFacts()') && app.includes('本页关键信息'), {});
 check('disease-brief-entry', app.includes('data-action="disease-brief"') && /aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势"/.test(app), {});
 const readmeMd = read('README.md');
 check('disease-brief-four-sections',

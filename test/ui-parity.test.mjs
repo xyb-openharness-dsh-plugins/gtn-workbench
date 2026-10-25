@@ -1,4 +1,4 @@
-/* 逐视图 parity：public/ 与 prototypes/v0.6/（v0.6.0 十二页原型（疾病概要 ? 入口随签），签认基准）必须是
+/* 逐视图 parity：public/ 与 prototypes/v0.7/（v0.7.0 十二页原型（疾病概要 ? + 每页「和 AI 讨论」随签），签认基准）必须是
  * 「同一份渲染代码，只换数据来源」。
  *
  * 钉五件事：
@@ -18,7 +18,7 @@ import { test } from 'node:test';
 const ROOT = new URL('..', import.meta.url).pathname;
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-const proto = read('prototypes/v0.6/app.js');
+const proto = read('prototypes/v0.7/app.js');
 const shipped = read('public/app.js');
 
 /** 从源码里抠出一个 `const X = ...;` 常量块（到行尾分号；原型与开发版同形，够用）。 */
@@ -63,7 +63,7 @@ test('③ 12 个一级页与文案常量：两边逐字一致', () => {
 });
 
 test('④ 样式表与原型逐字节一致（开发版外壳样式只进 shell.css）', () => {
-  assert.equal(read('public/style.css'), read('prototypes/v0.6/style.css'),
+  assert.equal(read('public/style.css'), read('prototypes/v0.7/style.css'),
     'style.css 与原型不一致；改视觉先改原型再同步，外壳样式去 shell.css');
 });
 
@@ -87,7 +87,7 @@ test('⑤ index.html 只差法定项：版本归一化 + 原型条文案 + 外�
     .replace(/\n{2,}/g, '\n')
     .trim();
   const a = strip(read('public/index.html'));
-  const b = strip(read('prototypes/v0.6/index.html'));
+  const b = strip(read('prototypes/v0.7/index.html'));
   if (a !== b) {
     const la = a.split('\n'), lb = b.split('\n');
     for (let i = 0; i < Math.max(la.length, lb.length); i++) {

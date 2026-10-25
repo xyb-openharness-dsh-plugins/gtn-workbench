@@ -327,3 +327,8 @@ svg.chart.metric-chart { min-width: 640px; }
 .brief-sec p { font-size: 12.5px; margin: 0 0 6px; }
 .brief-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .brief-table th, .brief-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line, #eee); }
+
+/* 「和 AI 讨论」（脚手架标准）：每页标题行右侧，携带本页关键信息拉起对话栏 */
+.head-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.discuss-btn { border: 1px solid var(--accent, #8a5a44); background: transparent; color: var(--accent, #8a5a44); border-radius: 13px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+.discuss-btn:hover, .discuss-btn:focus-visible { background: var(--accent, #8a5a44); color: #fff; }
