@@ -4,27 +4,27 @@
 
 需求见 [BRIEF](docs/BRIEF.md)，规格见 [SPEC](docs/SPEC.md)，场景见 [SCENARIOS](docs/SCENARIOS.md)，交互合同见 [INTERACTION-DESIGN](docs/INTERACTION-DESIGN.md)，临床口径见 [CLINICAL-DATA](docs/CLINICAL-DATA.md)（NCCN GTN 2.2026 / FIGO 2000 / 中华医学会 2021）；先读 [AGENTS](AGENTS.md)。
 
-## 关键功能（v0.1.0 原型实渲截图，演示数据、患者人名虚构）
+## 关键功能（v0.1.1 原型实渲截图，演示数据、患者人名虚构）
 
 ### 看板 —— "我现在该做什么"
-![看板](docs/screenshots/readme-dashboard-0.1.0.png)
+![看板](docs/screenshots/readme-dashboard-0.1.1.png)
 「接下来」卡按医嘱节奏列出本周 hCG 复查、随访月与复诊准备；数值只陈述记录，不给判定。
 
 ### hCG 时间线 —— 这个工作台与别的有什么不同
-![hCG 时间线](docs/screenshots/readme-hcg-timeline-0.1.0.png)
+![hCG 时间线](docs/screenshots/readme-hcg-timeline-0.1.1.png)
 血 hCG 对数轴曲线（Fritsch–Carlson 平滑，不越数据点），平台期/反弹/达正常锚点事件由你勾选，工具不做判定。
 
 ### 治疗历程 —— 折叠卡（收起态 / 展开态）
-![疗程收起态](docs/screenshots/readme-treatment-folded-0.1.0.png)
-![疗程展开态](docs/screenshots/readme-treatment-expanded-0.1.0.png)
+![疗程收起态](docs/screenshots/readme-treatment-folded-0.1.1.png)
+![疗程展开态](docs/screenshots/readme-treatment-expanded-0.1.1.png)
 每疗一张折叠卡：收起看"第 N 疗·方案·起止·当日 hCG"，展开看详情与感受备注；「改这一条」更正不删除。
 
 ### 随访日历 —— 哪个月该查不靠记忆
-![随访日历](docs/screenshots/readme-followup-0.1.0.png)
+![随访日历](docs/screenshots/readme-followup-0.1.1.png)
 以你勾选的 hCG 达正常锚点为起点按月列记录入口（含避孕方式与再生育计划），未到月置灰；节奏出处可切换 NCCN 2.2026 / 中国 2021 / 我的医嘱。
 
 ### 设置 —— 资料目录与数据来源一眼可见
-![设置](docs/screenshots/readme-settings-0.1.0.png)
+![设置](docs/screenshots/readme-settings-0.1.1.png)
 患者资料目录、解析模式与凭据状态（不收集真实密钥）、临床参考数据包来源与版本。
 
 ## 怎么用
@@ -47,4 +47,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.1.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.1.1 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

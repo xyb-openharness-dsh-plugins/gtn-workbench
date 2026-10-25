@@ -1,6 +1,6 @@
 {
   "name": "@xyb-community/gtn-workbench",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "本机优先的GTN患者工作台：hCG血清序列时间线、化疗疗程折叠卡档案、末次妊娠与FIGO评分整理、治愈后随访日历与再生育记录（0访谈如实声明，不做诊断与治疗建议）",
   "private": true,
   "type": "module",
@@ -14,10 +14,14 @@
   "files": [
     "dsh",
     "lib",
+    "public",
+    "schema",
+    "research/gestational-trophoblastic/manifest.json",
     "assets",
     "cordis.patch.yml",
     "README.md",
-    "NOTICE.md"
+    "NOTICE.md",
+    "LICENSE"
   ],
   "scripts": {
     "check": "node --check dsh/index.js && node --check lib/client.js && node scripts/check-workbench-package.mjs . && node scripts/check-host-contract.mjs",

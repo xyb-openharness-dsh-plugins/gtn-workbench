@@ -1,5 +1,5 @@
 'use strict';
-/* 小葡宝 GraPal v0.1.0 — GTN 工作台交互原型（M2）。
+/* 小葡宝 GraPal v0.1.1 — GTN 工作台交互原型（M2）。
    数据唯一来源：window.DEMO_DATA（demo-data.js，全部模拟）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
