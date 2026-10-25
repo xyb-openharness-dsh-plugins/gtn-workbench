@@ -23,3 +23,12 @@ README/许可证/素材来源/运行依赖/更新说明：...
 回滚步骤/数据兼容检查/已知限制：...
 
 工作台市场发布另按 docs/10-MARKET-PUBLISHING.md 执行，附 templates/MARKET-ACCEPTANCE.md 的指定版本手工确认。官方指南复核日期/来源：... 最终安装来源：... 用户确认的项目与执行者：... PR URL/最新提交检查实际执行结果：... 市场目录可见与可安装证据：...。未授权投稿时标不适用，不把 Git push 当市场发布。
+
+
+## v0.4.0 · 2026-10-25
+
+- tgz：`release/xyb-community-gtn-workbench-0.4.0.tgz`
+- sha256：`e0a9944327f49b406051f3c655fe9a72409f5fed8d1e00cd9d82177dddb6c626`
+- 装机：desktop profile file: 依赖 + bundles 双登记；`corepack pnpm install --no-frozen-lockfile`；node_modules 链接 0.4.0 ✅；宿主已重启 ✅
+- 装机四要素对照 tgz ✅（dsh 块 / cordis patch root / lib/client.js 497 行真身 0 接入骨架 / 版本簿记 11 处同源）
+- **界面加载：待用户在 DeepSeek Harness 新建会话后确认**（首用会话授权，第 6 类；本机 TCC 限制无法自动化查看 harness 数据目录）
