@@ -38,9 +38,9 @@
 ![心理支持](docs/screenshots/readme-mind-0.2.0.png)
 情绪日记、“等报告日”单列记录（GTN 特异场景）、家庭沟通；私密记录仅本机。
 
-### 临床研究
-![临床研究](docs/screenshots/readme-trials-0.2.0.png)
-登记状态摘录（6 条，与 M4 四件套逐条一致）；登记 ≠ 有效 ≠ 可入组。
+### 临床研究 · 三档匹配（MATCHING-SPEC 模式）
+![临床研究](docs/screenshots/readme-trials-0.4.0.png)
+个人入组档案（不重复录入，完整度 8/10）→ 自带 sqlite 检索 + AI 协助起草（不代发）→ 三档结果卡（已满足/可能冲突/无法判定，缺失永远无法判定）；不给匹配百分比、不排序推荐；登记 ≠ 有效 ≠ 可入组。
 
 ### 设置
 ![设置](docs/screenshots/readme-settings-0.2.0.png)
@@ -66,4 +66,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.2.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.4.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
