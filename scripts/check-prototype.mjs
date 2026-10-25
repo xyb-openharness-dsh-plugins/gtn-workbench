@@ -67,7 +67,10 @@ const BLACKLIST = [
   [/正常(?!锚点)/g, '正常（除「达正常锚点」固定词组）'],
   [/异常/g, '异常'], [/高危/g, '高危'], [/低危/g, '低危'],
   [/建议治疗/g, '建议治疗'], [/可以停药/g, '可以停药'],
-  [/安全期|安全/g, '安全 / 安全期'], [/可怀孕|可以怀孕/g, '可怀孕 / 可以怀孕']
+  [/安全期|安全/g, '安全 / 安全期'], [/可怀孕|可以怀孕/g, '可怀孕 / 可以怀孕'],
+  // 评审 P2#8 扩充（2026-10-25 独立评审）：结论性词形同禁。
+  [/治愈/g, '治愈'], [/达标/g, '达标（疗效判定口径）'], [/缓解/g, '缓解'],
+  [/复发风险/g, '复发风险']
 ];
 const blHits = [];
 for (const [file, src] of Object.entries({ 'public/app.js': app, 'public/demo-data.js': data, 'public/index.html': html, 'public/style.css': css })) {
@@ -111,7 +114,7 @@ check('more-menu-manual-entry', /⋯ 更多/.test(app), {});
 check('decimal-keypad', /inputmode="decimal"/.test(app) && /data-keypad/.test(app) && /keypad/.test(css), {});
 /* ---------- demo 数据完整性（林小葡旅程） ---------- */
 const pts = (data.match(/d: '\d{4}-\d{2}-\d{2}', v:/g) || []).length;
-check('demo-journey', data.includes('林小葡') && pts >= 13 && /platform/.test(data) && /anchor/.test(data) && /rebound/.test(data), { hcgPoints: pts });
+check('demo-journey', data.includes('林小葡') && pts >= 13 && /plateau/.test(data) && /anchor/.test(data) && /rise/.test(data), { hcgPoints: pts });
 
 const failed = results.filter((r) => !r.ok);
 const summary = { ok: failed.length === 0, total: results.length, failed: failed.length, checks: results, at: new Date().toISOString() };

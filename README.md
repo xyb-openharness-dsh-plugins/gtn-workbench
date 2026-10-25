@@ -1,44 +1,50 @@
 # 小葡宝 GraPal 妊娠滋养细胞肿瘤（GTN）工作台（品牌占位）
 
-本机优先的GTN患者工作台：hCG血清序列时间线、化疗疗程折叠卡档案、末次妊娠与FIGO评分整理、治愈后随访日历与再生育记录（0访谈如实声明，不做诊断与治疗建议）
+本机优先的 GTN 患者病程整理工作台：hCG 血清序列时间线（对数轴、无判读）、化疗疗程折叠卡档案、末次妊娠与 FIGO 评分自录整理、hCG 达正常锚点后随访日历与再生育记录、复诊准备。**不做诊断与治疗建议，不出任何判定性输出；0 访谈如实声明，患者原话均为改写占位句。**服务主体＝患者本人为主，照护者兼容（DEV-REQUIREMENTS）。
 
-这是接入骨架，尚未实现真实业务。初始化后先将 [项目设计提示词](docs/DESIGN-PROMPT.md) 交给当前Agent；它应展示实际路径并以已有用户/场景/流程素材对齐设计者、研究与取舍原则。癌种项目另有 [完整专用提示词](prompts/NEW-CANCER-WORKBENCH.md)。需求见 [BRIEF](docs/BRIEF.md)，规格见 [SPEC](docs/SPEC.md)，任务见 [TASKS](docs/TASKS.md)；先读 [AGENTS](AGENTS.md)。CLI输出交接与首问，实际对话由Agent接续。
+需求见 [BRIEF](docs/BRIEF.md)，规格见 [SPEC](docs/SPEC.md)，场景见 [SCENARIOS](docs/SCENARIOS.md)，交互合同见 [INTERACTION-DESIGN](docs/INTERACTION-DESIGN.md)，临床口径见 [CLINICAL-DATA](docs/CLINICAL-DATA.md)（NCCN GTN 2.2026 / FIGO 2000 / 中华医学会 2021）；先读 [AGENTS](AGENTS.md)。
 
-## 开发顺序
+## 关键功能（v0.1.0 原型实渲截图，演示数据、患者人名虚构）
 
-先共创SPEC和候选数据关系，再交付HTML交互工作台；由用户确认对应版本/模块后，复核SCHEMA/API并实现生产功能。确认记录见docs/PROTOTYPE-REVIEW.md；模型不依赖前端Tab/流程。模板骨架不是业务已确认。
+### 看板 —— "我现在该做什么"
+![看板](docs/screenshots/readme-dashboard-0.1.0.png)
+「接下来」卡按医嘱节奏列出本周 hCG 复查、随访月与复诊准备；数值只陈述记录，不给判定。
 
-## 当前能力
+### hCG 时间线 —— 这个工作台与别的有什么不同
+![hCG 时间线](docs/screenshots/readme-hcg-timeline-0.1.0.png)
+血 hCG 对数轴曲线（Fritsch–Carlson 平滑，不越数据点），平台期/反弹/达正常锚点事件由你勾选，工具不做判定。
 
-- 一个 DSH 工作台注册、认证的健康接口、版本展示与标准/大字切换。
-- 已明确选择布局：business-first。business-first 使用 customFrame；模板不创建会话或复制聊天。需要 AI 协助时按官方合同接入原生 conversation 和会话管理。
-- 无业务数据库、无演示患者、无真实密钥；所有业务页按确认 spec 逐项实现。
+### 治疗历程 —— 折叠卡（收起态 / 展开态）
+![疗程收起态](docs/screenshots/readme-treatment-folded-0.1.0.png)
+![疗程展开态](docs/screenshots/readme-treatment-expanded-0.1.0.png)
+每疗一张折叠卡：收起看"第 N 疗·方案·起止·当日 hCG"，展开看详情与感受备注；「改这一条」更正不删除。
 
-## 开发与本地验收
+### 随访日历 —— 哪个月该查不靠记忆
+![随访日历](docs/screenshots/readme-followup-0.1.0.png)
+以你勾选的 hCG 达正常锚点为起点按月列记录入口（含避孕方式与再生育计划），未到月置灰；节奏出处可切换 NCCN 2.2026 / 中国 2021 / 我的医嘱。
 
-需要 Node.js 22+、Git、包管理器和可用 DSH Desktop；采用 SQLite 时另核验 node:sqlite 版本条件。宿主 peers 的范围仅是模板基线，请与目标 Desktop 实际依赖核对。
+### 设置 —— 资料目录与数据来源一眼可见
+![设置](docs/screenshots/readme-settings-0.1.0.png)
+患者资料目录、解析模式与凭据状态（不收集真实密钥）、临床参考数据包来源与版本。
+
+## 怎么用
+
+原型：直接打开 `public/index.html`（或 `python3 -m http.server` 后访问），全部为演示数据。
+生产版（M5 后）：DSH Desktop 本地 tgz 安装，见 [RELEASE](docs/RELEASE.md)；首次使用先新建会话（宿主按会话授权）。
+
+## 数据与口径
+
+- 本机优先，患者数据不出本机；MinerU 云解析逐文件授权。
+- 临床试验为登记状态摘录（research/gestational-trophoblastic，6 条，"未查过"通道如实记录）；登记 ≠ 有效 ≠ 可入组。
+- 数据层无判读列（schema/0001 冻结 + check-schema 断言）；更正只新增版本不覆盖。
+
+## 开发
 
 ```bash
-npm install
-npm run check
-npm run pack:check
-npm pack
+node scripts/check-prototype.mjs   # 原型 HVT/IP 断言（20 项）
+node scripts/check-schema.mjs      # schema 冻结 + 判读列断言
+node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
+npm run check                      # 装包合同静态检查
 ```
 
-`npm run check` 只保证"能装"（语法 + 装包合同），第一天就该是绿的。`npm run audit` 管"还是不是家族里的一员"：版本三处一致、`lib/layout.js` 面板参数单一来源、检查链完整、文档与密钥卫生，**只看代码与文件，不看文档自述**。新项目刚生成时 audit 必然有 fail，那是待办清单；交付/发布前必须清零，存在 fail 不得发布（`npm run release:check` 一次跑完两者）。
-
-跑的时间点：**每次改完**跑 `check`；**G2 原型确认后、写业务代码前**先跑一次 `audit`（这时缺的多是 `lib/layout.js`、`VERSION` 这类结构，越早补越便宜）；**交付/装机前**必须跑 `release:check`；**发布或投稿前**把 `npm run audit --json` 的 `xx/xx 通过 · N 失败 · M 待人工` 抄进 `docs/RELEASE.md` 的「家族一致性」一行。`✗` 是结构缺口（补齐，或在 `docs/DEV-REQUIREMENTS-<日期>.md` 写明偏离理由并由用户确认），`!` 是需人工判断的项（逐条给「已人工确认 / 确实没有」）。
-
-`npm install` 可能按 npm 策略解析 peer；勿为消警告重复打包宿主 runtime。客户端本身是单文件；引入 TS/组件库后需添加构建步骤并保留单文件导出。
-
-本地安装入口以当前 Desktop/CLI 帮助为准。安装后按 [docs/06-VALIDATION-AND-RELEASE.md](docs/06-VALIDATION-AND-RELEASE.md) 与官方自测完成真实 UI 验收，并填写 [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md)。静态检查不代表已加载。
-
-Logo 来源与使用限制见 assets/README.md。许可证、作者、仓库/发布策略由本项目维护者确认后填写；模板默认为 private/UNLICENSED。
-
-感谢小x宝社区、DataElement 社区，以及 sam / hhx / 繁华的 ❤️ 贡献。
-
-初始化来源记录见 `.dsh-wb-starter.json`。更新社区脚手架不会覆盖本项目；需要升级时先用相同确认配置在临时目录生成，再审阅差异。CLI 用法见 [docs/CLI-GIT.md](docs/CLI-GIT.md)。
-
-## HTML先行与数据演进
-
-业务开发前先交付HTML交互工作台原型、实际预览并由用户确认版本/hash和范围。数据设计先区分领域事实、流程状态和页面读模型，走查前端/流程变化、兼容与迁移；原型对象不直接作为表。见[规范](docs/14-HTML-AND-DATA-CONTRACT.md)。
+版本 v0.1.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

@@ -130,7 +130,7 @@ function smoothPath(coords) {
   return out;
 }
 
-const EVENT_LABEL = { platform: '平台期', rebound: '反弹', anchor: 'hCG 达正常锚点' };
+const EVENT_LABEL = { plateau: '平台期', rise: '反弹', anchor: 'hCG 达正常锚点' };
 
 function hcgChart() {
   const pts = D.hcg.points;
@@ -216,7 +216,7 @@ function vDashboard() {
 }
 
 function hcgRow(p) {
-  const evSel = `<span class="ev-pick" role="group" aria-label="事件标记（三态，由你勾选）">${['platform', 'rebound', 'anchor'].map(k =>
+  const evSel = `<span class="ev-pick" role="group" aria-label="事件标记（三态，由你勾选）">${['plateau', 'rise', 'anchor'].map(k =>
     `<button class="chip${p.event === k ? ' on' : ''}" data-action="mark-event" data-d="${p.d}" data-ev="${k}" aria-pressed="${p.event === k}">${EVENT_LABEL[k]}</button>`).join('')}${p.event ? `<button class="chip soft" data-action="mark-event" data-d="${p.d}" data-ev="">取消</button>` : ''}</span>`;
   return row(
     `${esc(p.d)} · <b>${p.versions ? p.versions[p.versions.length - 1].v : p.v}</b> ${D.hcg.unit}`,
@@ -343,7 +343,8 @@ function vImport() {
   <div class="card"><div class="card-head"><h2>AI 候选核对区（${pend.length}）</h2>${pill('未核实', 'yellow')}</div>
     ${pend.length ? pend.map(candItem).join('') : emptyBox('没有待核对候选', '点上方「导入报告」载入一份模拟化验单试试。')}
   </div>
-  ${agentPane('请帮我解析这份化验单照片，抽出日期 / 数值 / 单位 / 医院四个字段做候选，逐项等我核对；数值原文照抄，不判定高低。')}`;
+  ${agentPane('请帮我解析这份化验单照片，抽出日期 / 数值 / 单位 / 医院四个字段做候选，逐项等我核对；数值原文照抄，不判定高低。')}
+      ${quoteLine(QUOTE.none)}`;
 }
 
 function candItem(c) {
@@ -390,7 +391,8 @@ function vReview() {
     <div class="notice">生成失败保留草稿勾选；材料与档案同源（demo 数据唯一来源）。</div>
   </div>
   ${preview || emptyBox('还没有生成预览', '勾选上面要带上的范围，点「生成预览」。')}
-  ${agentPane('请帮我把复诊材料压缩成一页口头汇报：先数值（最近 hCG），再疗程，最后三个最想问的问题；只整理我记录的内容，不加建议。')}`;
+  ${agentPane('请帮我把复诊材料压缩成一页口头汇报：先数值（最近 hCG），再疗程，最后三个最想问的问题；只整理我记录的内容，不加建议。')}
+      ${quoteLine(QUOTE.none)}`;
 }
 
 function vSettings() {

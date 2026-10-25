@@ -1,5 +1,5 @@
 /* 小葡宝 GraPal v0.1.0 — 交互原型样式。
-   窄宽第一（30 号）：默认 375px 可用；多列一律 minmax(0,1fr)；字号全程 12.5–15px；
+   窄宽第一（30 号）：默认 375px 可用；多列一律 minmax(0,1fr)；正文/控件字号 12.5–15px（标题与键盘屏为例外，评审 P2#7 修正注释）；
    页脚贴底（workspace min-height + footer 沉底）；显隐统一 [hidden]。 */
 :root {
   --paper: #faf8fb; --surface: #fff; --ink: #2b2434; --ink-2: #4d4459; --muted: #857a94;
