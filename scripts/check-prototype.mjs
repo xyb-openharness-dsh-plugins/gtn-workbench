@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /* check-prototype.mjs — 无头静态断言（Node，不依赖浏览器）。
    用法：node scripts/check-prototype.mjs  → 输出 JSON，退出码 0=全绿 / 1=有失败。
-   覆盖：X1 孤儿页、X2 入口文案逐字一致、IP8「不可恢复」、判读词黑名单、
-   class="chart"、AI 不自动发送守卫、smoothPath、32 号折叠卡 beforeprint、版本链。 */
+   覆盖：X1 孤儿页、X2 入口文案逐字一致（P1–P11）、IP8「不可恢复」、判读词黑名单、
+   class="chart"、AI 不自动发送守卫、smoothPath、32 号折叠卡 beforeprint、版本链、
+   v0.5 检查与指标二级页签（subnav 键 / 多序列图 / 疗程竖条 / 无参考带）。 */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -14,6 +15,9 @@ const css = read('public/style.css');
 const html = read('public/index.html');
 const data = read('public/demo-data.js');
 const doc = read('docs/INTERACTION-DESIGN.md');
+/* demo-data 是浏览器脚本：借 dsh/demo.js 的加载器求值，拿到结构化 DEMO_DATA 做数值断言 */
+const { loadDemoData } = await import('../dsh/demo.js');
+const DEMO = loadDemoData(join(root, 'public/demo-data.js'));
 
 const results = [];
 const check = (id, ok, detail) => results.push({ id, ok: !!ok, detail });
@@ -49,7 +53,7 @@ for (const line of entryRows) {
 const missing = entries.filter((e) => !app.includes(e.text));
 /* 「第 N 个月随访 hCG」的 N 为文档占位符：常量本体逐字一致，渲染时 replace('N', 月序)。 */
 const usesP4 = /ENTRY_P4\.replace\('N'/.test(app);
-check('X2-entry-text', missing.length === 0 && usesP4 && entries.length === 10,
+check('X2-entry-text', missing.length === 0 && usesP4 && entries.length === 11,
   { entries, missing, p4TemplateRender: usesP4 });
 
 /* ---------- IP8：全站禁「不可恢复」 ---------- */
@@ -123,7 +127,7 @@ check('demo-journey', data.includes('林小葡') && pts >= 13 && /plateau/.test(
 /* ---------- v0.2.0 新增：3D 指标分类卡 ---------- */
 check('flip-3d-card-css', /transform-style:\s*preserve-3d/.test(css) && /rotateY\(180deg\)/.test(css) && /backface-visibility:\s*hidden/.test(css), {});
 check('flip-3d-card-js', /data-action="flip"/.test(app) && /aria-pressed/.test(app) && /state\.flipped/.test(app), {});
-check('flip-cats-not-in-chart', /分类不进趋势图|分类卡只做归口，不进趋势图/.test(app) && (app.match(/metricCatGrid\(\)/g) || []).length >= 2, {});
+check('flip-cats-not-in-chart', /分类卡只做归口/.test(app) && (app.match(/metricCatGrid\(\)/g) || []).length >= 2, {});
 /* ---------- v0.2.0 新增：临床研究页读 trials jsonl ----------
    demo-data.js 内嵌登记摘录快照必须与 research/gestational-trophoblastic/trials-2026.jsonl 逐条一致（登记号 + 题目）。 */
 let trialsLines = [];
@@ -168,6 +172,36 @@ check('match-dual-channel', /检索双通道/.test(app) && /自带库检索/.tes
 const tierCount = (t) => (data.match(new RegExp(`tier: '${t}'`, 'g')) || []).length;
 check('match-demo-tier-mix', tierCount('conflict') >= 1 && tierCount('undetermined') >= 2 && tierCount('satisfied') >= 6
   && /试验期间需采取避孕措施（登记原文未结构化，待确认）/.test(data), { conflict: tierCount('conflict'), undetermined: tierCount('undetermined'), satisfied: tierCount('satisfied') });
+
+/* ---------- v0.5.0 新增：检查与指标二级页签 + 多系列趋势 + 指标管理 ---------- */
+/* subnav 键：METRIC_TABS 五键齐全，页签切换 action 存在 */
+const tabsMatch = app.match(/const METRIC_TABS = \[([\s\S]*?)\];/);
+const tabKeys = tabsMatch ? Array.from(tabsMatch[1].matchAll(/\['([a-z]+)',/g), (m) => m[1]) : [];
+check('metric-subnav-tabs',
+  JSON.stringify(tabKeys) === JSON.stringify(['bhcg', 'cbc', 'liver', 'weight', 'manage'])
+  && /data-action="metric-tab"/.test(app) && /role="tablist"/.test(app),
+  { tabKeys });
+/* 多序列图：metricSeriesChart 存在（smoothPath 沿用），调用点 ≥ 4（WBC+NEUT / HGB / PLT / ALT+AST / Cr / 体重） */
+check('metric-multiseries-chart',
+  /function metricSeriesChart\(/.test(app) && (app.match(/metricSeriesChart\(/g) || []).length >= 5
+  && /class="chart metric-chart"/.test(app) && /数据点不足|开关显隐/.test(app), {});
+/* 疗程竖条：SVG 中性背景条存在（cycle-band），title 写档案事实口径 */
+check('metric-cycle-bands', /class="cycle-band"/.test(app) && /档案事实标注，不是判读/.test(app) && /\.cycle-band/.test(css), {});
+/* 无参考带红线加强：除既有 no-reference-band 外，「参考区间」只允许出现在"不画/无"语境 */
+const refCtx = (src) => (src.match(/.{0,4}参考区间/g) || []).filter((s) => !/不画|无参考区间/.test(s));
+check('metric-no-ref-band-context', refCtx(app).length === 0 && refCtx(data).length === 0
+  && !/ref_low|ref_high/.test(data), { appHits: refCtx(app).length, dataHits: refCtx(data).length });
+/* demo 数据：血常规四序列各 ≥8 点、肝肾功能三序列各 ≥6 点（真实日期、单位恒随行） */
+const seriesLen = (k) => { const s = (DEMO.metrics ? DEMO.metrics.series : []).find((x) => x.key === k); return s ? s.points.length : 0; };
+check('metric-demo-series',
+  ['wbc', 'neut', 'hgb', 'plt'].every((k) => seriesLen(k) >= 8) && ['alt', 'ast', 'cr'].every((k) => seriesLen(k) >= 6)
+  && (DEMO.metrics.series.every((s) => !!s.unit) || false),
+  { wbc: seriesLen('wbc'), neut: seriesLen('neut'), hgb: seriesLen('hgb'), plt: seriesLen('plt'), alt: seriesLen('alt'), ast: seriesLen('ast'), cr: seriesLen('cr') });
+/* 指标管理页：序列清单 + 显隐 + AI 导入候选（不代发）+「⋯ 更多」手工补录（数字键盘）+ 更正=版本链语言 */
+check('metric-manage-page',
+  /function vMetricManage/.test(app) && /指标序列清单/.test(app) && /data-action="metric-toggle"/.test(app)
+  && /metric-ai-cand/.test(app) && /metric-add/.test(app) && /data-keypad/.test(app)
+  && /更正=新增版本/.test(app) && /血 hCG \/ 血常规 \/ 肝肾功能 \/ 体重/.test(app), {});
 
 const failed = results.filter((r) => !r.ok);
 const summary = { ok: failed.length === 0, total: results.length, failed: failed.length, checks: results, at: new Date().toISOString() };

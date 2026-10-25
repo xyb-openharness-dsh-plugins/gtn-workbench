@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.4.0 — GTN 工作台开发版（M5，临床研究页按脚手架匹配模式重做）。
-   视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.4）；开发版只换数据来源：
+/* 小葡宝 GraPal v0.5.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
+   视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.4.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.5.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -76,14 +76,14 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 /* ---------------- 导航（IP2：12 个一级页与 P1–P10 双向覆盖） ---------------- */
 const PAGES = [
-  ['dashboard', '看板'], ['hcg', 'hCG 时间线'], ['diagnosis', '诊断档案'],
+  ['dashboard', '看板'], ['hcg', '检查与指标'], ['diagnosis', '诊断档案'],
   ['treatment', '治疗历程'], ['followup', '随访日历'], ['oneshow', '病情一图秀'],
   ['nutrition', '营养支持'], ['mind', '心理支持'], ['trials', '临床研究'],
   ['import', '资料导入'], ['review', '复诊准备'], ['settings', '设置']
 ];
 const SUBTITLES = {
   dashboard: '接下来做什么、数值走到哪、疗程记到哪，一页看全。',
-  hcg: '对数轴曲线 + 记录列表；事件由你勾选，工具不做判定。',
+  hcg: '二级页签：血 hCG 对数轴 / 血常规 / 肝肾功能 / 体重 / 指标管理；数值只呈现，工具不做判定。',
   diagnosis: '末次妊娠档案、FIGO 评分自录（照抄原始分）、病理原文摘录。',
   treatment: '每疗程一张折叠卡；改过就新增版本，旧值可查。',
   followup: '以你勾选的 hCG 达正常锚点为起点，按月记录。',
@@ -95,6 +95,12 @@ const SUBTITLES = {
   review: '勾选范围生成一份材料，与档案同源。',
   settings: '资料目录、解析模式与凭据状态、临床参考数据包来源与版本。'
 };
+
+/* ---------------- 检查与指标：二级页签（24 号规范：页内 Tab，不把每种化验拆成全局菜单） ---------------- */
+const METRIC_TABS = [
+  ['bhcg', '血 hCG'], ['cbc', '血常规'], ['liver', '肝肾功能'],
+  ['weight', '体重'], ['manage', '指标管理']
+];
 
 /* ---------------- 入口文案（X2：与 INTERACTION-DESIGN §1 逐字一致） ----------------
    「第 N 个月随访 hCG」中的 N 为文档占位符：渲染时替换为实际月序，
@@ -123,6 +129,8 @@ const QUOTE = {
 /* ---------------- 状态 ---------------- */
 const state = {
   view: 'dashboard',
+  metricTab: 'bhcg',          // 检查与指标二级页签：bhcg | cbc | liver | weight | manage
+  metricHidden: new Set(),    // 指标序列显隐（series key 集合，仅本机演示态）
   drawer: false,
   source: 'mine',            // 出处切换：nccn | csm | mine
   reviewSel: { hcg: true, cycles: true, figo: true, questions: true },
@@ -172,7 +180,7 @@ function agentPane(promptText) {
 /* ---------------- 指标分类 3D 翻转卡（看板 + hCG 时间线） ----------------
    写法照乳腺癌基准（.mcard）：perspective 容器 + preserve-3d 内层 + rotateY(180deg) 翻面，
    backface-visibility:hidden 双面；按钮原生 Enter/Space 触发 click，键盘可达；
-   aria-pressed 同步翻转态。分类不进趋势图：只有 hCG 数值序列画曲线（见 chart-log-axis 断言）。 */
+   aria-pressed 同步翻转态。分类卡只做归口不画曲线；数值序列在「检查与指标」各二级页签画线。 */
 function metricCatCard(c) {
   const flipped = state.flipped.has(c.key);
   return `<button class="mcard" data-action="flip" data-key="${c.key}" aria-pressed="${flipped}" aria-label="指标分类：${esc(c.name)}，最近 ${esc(c.latest)}，共 ${c.count} 次；点按或回车翻到背面看记录说明">
@@ -187,7 +195,7 @@ function metricCatCard(c) {
       <span class="mface back" aria-hidden="true">
         <span class="name">${esc(c.name)} · 记录说明</span>
         <span class="note">${esc(c.note)}</span>
-        <span class="count">本分类不画曲线（仅 hCG 数值序列画线）</span>
+        <span class="count">本分类卡不画曲线；数值序列在「检查与指标」对应二级页签画线</span>
         <span class="go">${esc(c.goLabel)} →</span>
       </span>
     </span>
@@ -196,7 +204,7 @@ function metricCatCard(c) {
 function metricCatGrid() {
   return `<section class="card"><div class="card-head"><h2>指标分类（点卡片翻转）</h2><span class="muted">四类 · 正面看最近值，背面看说明与入口</span></div>
     <div class="mgrid">${D.metricCats.map(metricCatCard).join('')}</div>
-    <p class="muted small">分类卡只做归口，不进趋势图；血 hCG 曲线在「hCG 时间线」页。</p>
+    <p class="muted small">分类卡只做归口；血 hCG 曲线在「检查与指标 → 血 hCG」页签，多系列趋势在各对应页签。</p>
   </section>`;
 }
 
@@ -349,9 +357,72 @@ function hcgRow(p) {
   );
 }
 
-function vHcg() {
-  return `${pageHead('hcg')}
-  ${metricCatGrid()}
+/* ---------------- 检查与指标：二级页签页（血 hCG / 血常规 / 肝肾功能 / 体重 / 指标管理） ---------------- */
+/* 二级结构选择：把原「hCG 时间线」一级页扩为带二级页签的「检查与指标」页（24 号规范：
+   页内 Tab 承载化验分类，不把每种化验拆成全局菜单）；血 hCG 页签内容与原一级页完全一致。 */
+function metricSubnav() {
+  return `<nav class="subnav" role="tablist" aria-label="检查与指标二级页签">${METRIC_TABS.map(([k, l]) =>
+    `<button role="tab" class="chip${state.metricTab === k ? ' on' : ''}" data-action="metric-tab" data-arg="${k}" aria-selected="${state.metricTab === k}">${esc(l)}</button>`).join('')}</nav>`;
+}
+
+/* 多系列线性趋势图：同单位序列同图双线（line-a / line-b）；每序列可点 chip 开关显隐；
+   化疗疗程起止日画中性竖条背景（cycle-band，档案事实标注，不是判读）；无参考区间带。 */
+function metricSeriesChart(seriesIn, hLabel) {
+  const series = seriesIn.filter((s) => !state.metricHidden.has(s.key) && s.points.length);
+  const CWm = 900, CHm = 300, X0 = 64, X1 = 860, Y0 = 28, Y1 = 240;
+  const allPts = series.flatMap((s) => s.points);
+  const toggles = seriesIn.map((s, i) =>
+    `<button class="chip${state.metricHidden.has(s.key) ? '' : ' on'}" data-action="metric-toggle" data-arg="${s.key}" aria-pressed="${!state.metricHidden.has(s.key)}"><i class="dot-line sw${i % 2}"></i>${esc(s.name)}（${esc(s.unit)}）</button>`).join('');
+  if (!series.length || !allPts.length) {
+    return `<div class="chip-row" role="group" aria-label="序列显隐">${toggles}</div><div class="empty"><h3>暂无可画的数据点</h3><p>序列已隐藏或还没有记录；去「指标管理」页签补录或开 AI 导入候选。</p></div>`;
+  }
+  const ds = allPts.map((p) => Date.parse(p.d));
+  const t0 = Math.min(...ds), t1 = Math.max(...ds);
+  const vs = allPts.map((p) => p.v);
+  let vmin = Math.min(...vs), vmax = Math.max(...vs);
+  const padV = (vmax - vmin) * 0.12 || Math.abs(vmax || 1) * 0.1 || 1;
+  vmin -= padV; vmax += padV;
+  const xOf = (d) => X0 + (Date.parse(d) - t0) / Math.max(1, t1 - t0) * (X1 - X0);
+  const yOf = (v) => Y1 - (v - vmin) / (vmax - vmin) * (Y1 - Y0);
+  /* 疗程竖条：起止日之间的中性背景矩形（class="cycle-band"），title 写「第 N 疗 · 起止」档案事实 */
+  const bands = D.cycles.map((c) => {
+    const x = xOf(c.start), w = Math.max(4, xOf(c.end) - xOf(c.start));
+    return `<rect class="cycle-band" x="${x.toFixed(1)}" y="${Y0}" width="${w.toFixed(1)}" height="${Y1 - Y0}"><title>第 ${c.n} 疗 · ${c.start} → ${c.end}（档案事实标注，不是判读）</title></rect>`;
+  }).join('');
+  /* 纵轴 4 条网格 + 数值刻度（只标数值，不标区间） */
+  const grid = [0, 1, 2, 3].map((i) => {
+    const v = vmin + (vmax - vmin) * (i / 3);
+    return `<line class="grid" x1="${X0}" x2="${X1}" y1="${yOf(v).toFixed(1)}" y2="${yOf(v).toFixed(1)}"/><text class="tick" x="${X0 - 8}" y="${(yOf(v) + 3.5).toFixed(1)}" text-anchor="end">${v.toFixed(vmax - vmin > 20 ? 0 : 1)}</text>`;
+  }).join('');
+  const ticks = series[0].points.map((p) => {
+    const d = new Date(Date.parse(p.d));
+    return `<text class="tick" x="${xOf(p.d).toFixed(1)}" y="${Y1 + 16}" text-anchor="middle">${d.getMonth() + 1}/${d.getDate()}</text>`;
+  }).join('');
+  const paths = series.map((s, i) => {
+    const coords = s.points.map((p) => ({ x: xOf(p.d), y: yOf(p.v) }));
+    const dots = s.points.map((p) => `<circle class="pt" cx="${xOf(p.d).toFixed(1)}" cy="${yOf(p.v).toFixed(1)}" r="4"><title>${esc(p.d)} · ${p.v} ${esc(s.unit)} · ${esc(s.source || '')}</title></circle>`).join('');
+    return `<path class="line sw${i % 2}" d="${smoothPath(coords)}" pathLength="1"/>${dots}`;
+  }).join('');
+  const label = hLabel || `${series.map((s) => `${s.name}（${s.unit}）`).join(' + ')} · 时间轴按真实采样日期`;
+  return `<div class="chip-row" role="group" aria-label="序列显隐">${toggles}</div>
+  <svg class="chart metric-chart" viewBox="0 0 ${CWm} ${CHm}" role="img" aria-label="${esc(label)}；纵轴为线性数值刻度，浅色竖条为化疗疗程起止（档案事实），不画参考区间带">
+    ${bands}${grid}<line class="axis" x1="${X0}" x2="${X1}" y1="${Y1}" y2="${Y1}"/>${ticks}
+    ${paths}
+    <text class="tick" x="${X1}" y="${Y1 + 34}" text-anchor="end">竖条 = 化疗疗程起止（第几疗 · 档案事实标注）；数值照抄 · 单位恒随行 · 不画参考区间带</text>
+  </svg>`;
+}
+
+/* 迷你 spark（指标管理清单行内）：只连线不标轴，点上去看数值 */
+function metricSpark(points, unit) {
+  if (points.length < 2) return '<span class="muted small">点数不足</span>';
+  const W = 96, H = 28, vs = points.map((p) => p.v);
+  const vmin = Math.min(...vs), vmax = Math.max(...vs);
+  const coords = points.map((p, i) => ({ x: (i / (points.length - 1)) * (W - 8) + 4, y: H - 3 - (p.v - vmin) / Math.max(1e-9, vmax - vmin) * (H - 6) }));
+  return `<svg class="metric-spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path class="line" d="${smoothPath(coords)}" pathLength="1"/></svg>`;
+}
+
+function vMetricHcgTab() {
+  return `${metricCatGrid()}
   <div class="card chart-card"><div class="card-head"><h2>血 hCG 时间线</h2><span class="muted">对数轴 · 无参考区间带</span></div>
     <div class="chart-wrap">${hcgChart()}</div>
   </div>
@@ -362,6 +433,92 @@ function vHcg() {
   </div>
   ${candidateCard('hcg')}
   ${agentPane('请帮我把 2026-03-16 以来的血 hCG 记录整理成一张按日期排列的清单（日期 / 数值 / 单位 / 来源），保持原文数值不改写，不要加入任何判定或解释。')}`;
+}
+
+function seriesByGroup(g) { return (D.metrics ? D.metrics.series : []).filter((s) => s.group === g); }
+
+function vMetricCbc() {
+  const cbc = seriesByGroup('cbc');
+  const same = cbc.filter((s) => s.unit === '×10⁹/L');          // WBC / NEUT 同单位同图双线
+  const hgb = cbc.filter((s) => s.key === 'hgb');
+  const plt = cbc.filter((s) => s.key === 'plt');
+  const small = (list) => `<div class="card chart-card"><div class="card-head"><h2>${list.map((s) => esc(s.name)).join(' / ')} 趋势</h2><span class="muted">单位 ${esc(list[0].unit)} · 各自成图</span></div>
+    <div class="chart-wrap">${metricSeriesChart(list)}</div></div>`;
+  return `<div class="notice">${esc(D.metrics.note)}同单位可比的序列（WBC / NEUT，均为 ×10⁹/L）同图双线；HGB（g/L）与 PLT（×10⁹/L）各自成图，不做双轴。</div>
+  <div class="card chart-card"><div class="card-head"><h2>白细胞与中性粒细胞趋势</h2><span class="muted">同单位 ×10⁹/L · 双序列可开关显隐</span></div>
+    <div class="chart-wrap">${metricSeriesChart(same)}</div></div>
+  ${small(hgb)}${small(plt)}
+  ${agentPane('请帮我把化疗期血常规四项（WBC / NEUT / HGB / PLT）按日期整理成清单（日期 / 项目 / 数值 / 单位 / 来源），数值原文照抄，不写高低、不加解释。')}`;
+}
+
+function vMetricLiver() {
+  const liver = seriesByGroup('liver');
+  const same = liver.filter((s) => s.unit === 'U/L');           // ALT / AST 同单位同图双线
+  const cr = liver.filter((s) => s.key === 'cr');
+  return `<div class="notice">${esc(D.metrics.note)}ALT 与 AST（均为 U/L）同图双线；Cr（μmol/L）各自成图，不做双轴。</div>
+  <div class="card chart-card"><div class="card-head"><h2>谷丙 / 谷草转氨酶趋势</h2><span class="muted">同单位 U/L · 双序列可开关显隐</span></div>
+    <div class="chart-wrap">${metricSeriesChart(same)}</div></div>
+  <div class="card chart-card"><div class="card-head"><h2>肌酐趋势</h2><span class="muted">单位 μmol/L · 各自成图</span></div>
+    <div class="chart-wrap">${metricSeriesChart(cr)}</div></div>
+  ${agentPane('请帮我把化疗期肝肾功能三项（ALT / AST / Cr）按日期整理成清单（日期 / 项目 / 数值 / 单位 / 来源），数值原文照抄，不写高低、不加解释。')}`;
+}
+
+function vMetricWeight() {
+  const w = D.nutrition.weight;
+  const series = [{ key: 'weight', name: '体重', unit: 'kg', points: w, source: '手工记录' }];
+  return `<div class="notice">体重序列由「营养支持」页的手工记录并入同一来源；数值照抄、单位恒随行（kg），无参考区间带。</div>
+  <div class="card chart-card"><div class="card-head"><h2>体重序列趋势（${w.length} 点）</h2><span class="muted">完整序列图 · kg</span></div>
+    <div class="chart-wrap">${metricSeriesChart(series)}</div>
+    <div class="rows">${row('最近一次', `${w[w.length - 1].d} · ${w[w.length - 1].v} kg · 手工记录`)}</div>
+    <div class="actions"><button class="soft" data-action="go" data-arg="nutrition">去营养支持记体重 →</button></div>
+  </div>
+  ${agentPane('请帮我把化疗期到随访期的体重记录按日期列成清单（日期 / 数值 / 单位），只陈述记录，不做任何变化方向的解读。')}`;
+}
+
+/* 指标管理：全部指标序列清单（分节走 section_titles 心智：血 hCG / 血常规 / 肝肾功能 / 体重）。 */
+function metricManageRow(s) {
+  const last = s.points[s.points.length - 1];
+  const hidden = state.metricHidden.has(s.key);
+  return `<div class="row"><div class="row-main"><div>
+    <b>${esc(s.name)}</b><p>${esc(s.unit)} · 已记录 ${s.points.length} 次 · 最近 ${esc(last.d)} · <b>${last.v} ${esc(s.unit)}</b> · 来源：${esc(s.source)}</p>
+    ${s.note ? `<p class="muted small">报告原文照抄：${esc(s.note)}</p>` : ''}
+  </div></div>
+  <div class="row-side metric-row-side">
+    ${metricSpark(s.points, s.unit)}
+    <div class="chip-row">
+      <button class="chip${hidden ? '' : ' on'}" data-action="metric-toggle" data-arg="${esc(s.key)}" aria-pressed="${!hidden}">${hidden ? '已隐藏' : '显示中'}</button>
+      ${moreMenu([{ action: 'metric-ai-cand', arg: s.key, label: 'AI：导入候选（不代发）' }, { action: 'metric-add', arg: s.key, label: '手工补录一个值（数字键盘）' }])}
+    </div>
+  </div></div>`;
+}
+
+function vMetricManage() {
+  const hcgSeries = { key: 'bhcg', name: '血 hCG', unit: D.hcg.unit, points: D.hcg.points, source: '市一医院' };
+  const weightSeries = { key: 'bweight', name: '体重', unit: 'kg', points: D.nutrition.weight, source: '手工记录' };
+  return `<div class="notice">这里是全部指标序列的清单：看记录数与最近值、设置序列显隐、发起 AI 导入候选（gtn:agent-draft 契约：只起草不代发）或「⋯ 更多」手工补录（数字键盘）。要改一个已入档的值，走对应记录的「改这一条」——更正=新增版本，旧值进版本链，没有裸删除。</div>
+  <div class="card"><div class="card-head"><h2>指标序列清单</h2><span class="muted">分节：血 hCG / 血常规 / 肝肾功能 / 体重</span></div>
+    <div class="section-titles muted small">分节：血 hCG / 血常规 / 肝肾功能 / 体重 · 每行：序列名 / 单位 / 记录数 / 最近值 + 日期 / 迷你 spark / 来源</div>
+    <div class="rows">
+      <div class="subhead">血 hCG</div>
+      ${metricManageRow(hcgSeries)}
+      <div class="subhead">血常规</div>
+      ${seriesByGroup('cbc').map(metricManageRow).join('')}
+      <div class="subhead">肝肾功能</div>
+      ${seriesByGroup('liver').map(metricManageRow).join('')}
+      <div class="subhead">体重</div>
+      ${metricManageRow(weightSeries)}
+    </div>
+  </div>
+  ${agentPane('请帮我把全部指标序列整理成一张清单（序列名 / 单位 / 记录数 / 最近值与日期 / 来源），按血 hCG、血常规、肝肾功能、体重分节；数值原文照抄，不写高低与结论。')}`;
+}
+
+const METRIC_TAB_VIEWS = { bhcg: vMetricHcgTab, cbc: vMetricCbc, liver: vMetricLiver, weight: vMetricWeight, manage: vMetricManage };
+
+function vHcg() {
+  const view = METRIC_TAB_VIEWS[state.metricTab] || vMetricHcgTab;
+  return `${pageHead('hcg')}
+  ${metricSubnav()}
+  ${view()}`;
 }
 
 function vTreatment() {
@@ -836,6 +993,20 @@ function formAddHcg() {
     </div>`,
     `<button data-action="save-hcg">保存</button><button class="soft" data-action="close">取消</button>`);
 }
+function formAddMetricPoint(key) {
+  const s = (D.metrics ? D.metrics.series : []).find((x) => x.key === key);
+  if (!s) { toast('该序列暂不支持在此补录（血 hCG 请回「血 hCG」页签，体重请去营养支持页）。'); return; }
+  openDialog(`手工补录一个值 · ${s.name}（4 字段）`,
+    `<div class="form">
+      <label>日期<input name="d" value="2026-10-25" placeholder="YYYY-MM-DD"></label>
+      <label>数值<input name="v" data-keypad data-label="${esc(s.name)}数值" inputmode="decimal" placeholder="点此用数字键盘"></label>
+      <label>单位（照抄化验单原文）<input name="u" value="${esc(s.unit)}"></label>
+      <label>来源<input name="src" value="${esc(s.source)}"></label>
+    </div>
+    <div class="notice">数值照抄原文；更正一个已入档的值=「改这一条」新增版本，旧值进版本链。</div>`,
+    `<button data-action="save-metric-point" data-key="${esc(key)}">保存</button><button class="soft" data-action="close">取消</button>`);
+}
+
 function formAddCycle() {
   openDialog('记一个疗程（≤6 字段）',
     `<div class="form">
@@ -963,6 +1134,33 @@ const actions = {
   versions(el) {
     const p = D.hcg.points.find(x => x.d === el.dataset.d);
     if (p && p.versions) formVersions(p.versions, `版本链 · ${p.d}`);
+  },
+  /* 检查与指标：二级页签 / 序列显隐 / 手工补录 / AI 导入候选 */
+  'metric-tab'(el) { state.metricTab = el.dataset.arg || 'bhcg'; render(); },
+  'metric-toggle'(el) {
+    const k = el.dataset.arg;
+    if (state.metricHidden.has(k)) state.metricHidden.delete(k);
+    else state.metricHidden.add(k);
+    render();
+    toast(state.metricHidden.has(k) ? '该序列已隐藏（只是不画线，记录都还在）。' : '该序列已恢复显示。');
+  },
+  'metric-add'(el) { formAddMetricPoint(el.dataset.arg); },
+  'save-metric-point'(el) {
+    const key = el.dataset.key;
+    const s = D.metrics.series.find((x) => x.key === key);
+    const g = (n) => $(`#dialog-body [name="${n}"]`).value.trim();
+    if (s) {
+      s.points.push({ d: g('d') || '2026-10-25', v: Number(g('v')) || 0 });
+      s.points.sort((a, b) => (a.d < b.d ? -1 : 1));
+      if (g('src')) s.source = g('src');
+    }
+    closeDialog(); render(); toast('指标记录 +1（数字键盘手工通道）；曲线已更新。');
+  },
+  'metric-ai-cand'(el) {
+    const s = D.metrics.series.find((x) => x.key === el.dataset.arg);
+    D.imports.candidates.push({ id: uid('C'), file: `${s ? s.name : '指标'}化验单_AI候选.jpg`, authorized: false, unverified: true, status: 'pending',
+      fields: { '指标': s ? s.name : '', '日期': '2026-10-25', '数值': '', '单位': s ? s.unit : '', '医院': '市一医院' } });
+    render(); toast('AI 导入候选已生成（gtn:agent-draft 契约：只起草不代发）；候选在核对区，核对前不入事实层。');
   },
   /* 疗程 */
   'add-cycle'() { formAddCycle(); },

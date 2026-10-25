@@ -49,7 +49,7 @@ if (!SEMVER.test(version)) {
 
 /* 0) 冻结快照：原型不跟着版本走，只核对它没被改过号。
    v0.2 = 十二页初版（0.2.0）；v0.4 = 临床研究匹配重做版（0.4.0），都冻结在签认号上。 */
-for (const [dir, frozen] of Object.entries({ 'prototypes/v0.2': '0.2.0', 'prototypes/v0.4': '0.4.0' })) {
+for (const [dir, frozen] of Object.entries({ 'prototypes/v0.2': '0.2.0', 'prototypes/v0.4': '0.4.0', 'prototypes/v0.5': '0.5.0' })) {
   if (!existsSync(join(root, `${dir}/app.js`))) continue
   const appJs = read(`${dir}/app.js`)
   check(`${dir}/app.js（快照冻结）`, appJs.match(/version:\s*'([^']+)'/)?.[1], frozen)
@@ -105,8 +105,8 @@ for (const c of checks) {
 if (problems.length) {
   console.error('\n版本号不一致：')
   for (const p of problems) console.error(`  - ${p}`)
-  console.error('\n改版本时请先改 VERSION，再让其余位置与它一致（见 docs/VERSIONING.md）。\n原型快照 prototypes/v0.2 冻结在 0.2.0、prototypes/v0.4 冻结在 0.4.0，不随 VERSION 移动（D37）。')
+  console.error('\n改版本时请先改 VERSION，再让其余位置与它一致（见 docs/VERSIONING.md）。\n原型快照 prototypes/v0.2 冻结在 0.2.0、v0.4 冻结在 0.4.0、v0.5 冻结在 0.5.0，不随 VERSION 移动（D37）。')
   process.exit(1)
 }
 
-console.log(`\n✓ 版本号一致：v${version}（共核对 ${checks.length} 处；原型快照 v0.2 冻结在 0.2.0、v0.4 冻结在 0.4.0）`)
+console.log(`\n✓ 版本号一致：v${version}（共核对 ${checks.length} 处；原型快照 v0.2 冻结在 0.2.0、v0.4 冻结在 0.4.0、v0.5 冻结在 0.5.0)`)

@@ -178,6 +178,19 @@ export function seedDemo(db, input) {
     const insCat = db.prepare('INSERT INTO metric_cats (key, name, latest, count, note, go, go_label, ord) VALUES (?,?,?,?,?,?,?,?)');
     D.metricCats.forEach((c, i) => insCat.run(c.key, c.name, c.latest, c.count, c.note, c.go, c.goLabel, i));
 
+    /* 多系列指标（0005）：序列定义 + 数据点（数值照抄、单位随行、无 ref 判定列）。
+       体重仍在 weight_rows、血 hCG 仍在 hcg_rows，这里只收化验序列，不搬家不复制。 */
+    const insSeries = db.prepare(`INSERT INTO metric_series
+      (profile_key, key, name, unit, group_key, ord, source, in_use)
+      VALUES (?,?,?,?,?,?,?,1)`);
+    const insPoint = db.prepare(`INSERT INTO metric_points
+      (profile_key, series_key, drawn_on, value, unit, source, note, in_use, revision_of)
+      VALUES (?,?,?,?,?,?,?,1,null)`);
+    for (const s of (D.metrics ? D.metrics.series : [])) {
+      insSeries.run(key, s.key, s.name, s.unit, s.group, s.ord, s.source ?? null);
+      for (const p of s.points) insPoint.run(key, s.key, p.d, p.v, s.unit, s.source ?? null, s.note ?? null);
+    }
+
     /* 临床研究匹配（0004）：入排规则 + 一次评估快照。
        field_key/rule_type/condition 不进 demo-data（那是展示形状），这里按规则文本归类；
        judgments 按 match_rules.id 关联，保证"同样档案 + 同样规则版本 = 同样结果"。 */
@@ -226,6 +239,7 @@ export function seedDemo(db, input) {
     insMeta.run('trials_disclaimer', D.trials.disclaimer);
     insMeta.run('match_footer_note', D.match.footerNote);
     insMeta.run('match_channels_note', D.match.channelsNote);
+    if (D.metrics) insMeta.run('metrics_note', D.metrics.note);
 
     db.exec('COMMIT');
   } catch (error) {

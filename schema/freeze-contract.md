@@ -32,3 +32,9 @@
 ## 0004 内容边界（v0.4.0，2026-10-25 追加）
 
 新增 2 张表：入排规则库（match_rules，条件存 JSON、pending 单列）与匹配评估快照（match_assessments，档案 revision + 规则集版本 + 逐条判定 JSON + 生成时间）。三档枚举只出现在 judgments_json 的 tier 键（satisfied/conflict/undetermined）；无 conclusion 类判读列（判读列断言继续生效）；不改不删 0001–0003 任何定义。
+
+| `0005_metrics.sql` | 0c3b57646bdfe53f73e2784917fd31c08771c08bda88f856959c17595583927f |
+
+## 0005 内容边界（v0.5.0，2026-10-25 追加）
+
+新增 2 张表：指标序列定义（metric_series，key/名称/单位/组别/ord/source/in_use 显隐）与指标数据点（metric_points，series_key/drawn_on/value/unit 文本照抄/来源/note/更正链）。**不设 ref_low/ref_high 判定列**——报告原文参考区间如需留底进 note TEXT 逐字照抄，只作对照展示，不画带不比对不判读；体重仍在 weight_rows、血 hCG 仍在 hcg_rows（不搬家不复制）；无判读列（断言继续生效）；不改不删 0001–0004 任何定义。

@@ -304,3 +304,17 @@ svg.chart.weight-spark { min-width: 0; }
 .subhead { font-size: 12.5px; font-weight: 600; color: var(--brand-deep); letter-spacing: .06em; margin: 12px 0 2px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .subhead:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
 .section-titles { margin: 0 0 8px; }
+
+/* ============ v0.5.0 检查与指标：二级页签 + 多系列趋势 + 指标管理 ============ */
+.subnav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.subnav .chip { border-radius: 999px; }
+.subnav .chip.on { border-color: var(--brand-deep); box-shadow: inset 0 -2px 0 var(--brand-deep); }
+svg.chart .line.sw1 { stroke: var(--warn); }            /* 双序列第二线：中性琥珀，非红绿判定色 */
+svg.chart .pt.sw1 { fill: var(--warn); }
+.dot-line.sw1 { background: var(--warn); }
+svg.chart .cycle-band { fill: #f1ecf9; }                /* 疗程起止竖条：中性底纹，档案事实标注 */
+svg.chart.metric-chart { min-width: 640px; }
+.metric-spark { width: 96px; height: 28px; display: block; }
+.metric-spark .line { fill: none; stroke: var(--brand-deep); stroke-width: 2; }
+.metric-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.metric-row-side .chip-row { margin-bottom: 0; justify-content: flex-end; }

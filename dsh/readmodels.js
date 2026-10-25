@@ -9,7 +9,7 @@
  * 2. 显式 NULL：未测/未填就是 null，不落 0、不补空串；
  * 3. 分级/派生值读取时算、不落库：FIGO 总分由 figoTotal() 求和，表内无总分列；
  * 4. 随访锚点 = hcg_rows 上 event_mark='anchor' 那行（0001 口径 B，不设"治愈日期"权威列）；
- * 5. 分类不进趋势：metric_cats 只是归口文案，数值曲线只有 hCG。
+ * 5. 分类卡只做归口（metric_cats）；数值序列在 hcg_rows / metric_points / weight_rows，页面按二级页签画线。
  */
 
 import { AGENT_PANE } from '../lib/layout.js';
@@ -151,6 +151,34 @@ export function readMatch(db) {
   };
 }
 
+/* ---------------- 多系列指标（0005）：还原 metrics 形状（与 demo-data.js 同形） ----------------
+ * 序列按 ord/rowid；点按 rowid（demo 播种即时间序）；in_use=1 且非更正行的点进序列。
+ * note：series.note 取该序列第一条非空 point note（报告原文照抄，只作对照展示），无则 null。 */
+
+function readMetrics(db, key) {
+  const meta = metaMap(db);
+  const seriesRows = rows(db, 'SELECT key, name, unit, group_key, ord, source, in_use FROM metric_series WHERE profile_key = ? ORDER BY group_key, ord, rowid', key);
+  if (!seriesRows.length) return { note: meta.metrics_note ?? null, series: [] };
+  const pointRows = rows(db, 'SELECT series_key, drawn_on, value, unit, source, note FROM metric_points WHERE profile_key = ? AND in_use = 1 AND revision_of IS NULL ORDER BY rowid', key);
+  const bySeries = new Map();
+  for (const p of pointRows) {
+    if (!bySeries.has(p.series_key)) bySeries.set(p.series_key, []);
+    bySeries.get(p.series_key).push({ d: p.drawn_on, v: p.value });
+  }
+  const notes = new Map();
+  for (const p of pointRows) {
+    if (p.note && !notes.has(p.series_key)) notes.set(p.series_key, p.note);
+  }
+  return {
+    note: meta.metrics_note ?? null,
+    series: seriesRows.map((r) => ({
+      key: r.key, name: r.name, unit: r.unit, group: r.group_key,
+      ord: r.ord, inUse: !!r.in_use, source: r.source ?? null,
+      note: notes.get(r.key) ?? null, points: bySeries.get(r.key) ?? [],
+    })),
+  };
+}
+
 /* ---------------- 档案整体 ---------------- */
 
 function readProfile(db, key) {
@@ -227,6 +255,7 @@ function readProfile(db, key) {
     },
     metricCats: rows(db, 'SELECT key, name, latest, count, note, go, go_label FROM metric_cats ORDER BY ord, rowid')
       .map((r) => ({ key: r.key, name: r.name, latest: r.latest, count: r.count, note: r.note, go: r.go, goLabel: r.go_label })),
+    metrics: readMetrics(db, key),
     match: readMatch(db),
     /* settings 只回服务端可定值（目录/解析模式）；cred 状态由 /settings/mineru 单独给，packs 静态。 */
     settings: {
