@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小葡宝 GraPal · GTN 工作台 v0.1.0</title>
+<!-- 内联 favicon：file:// 静态打开不给 favicon.ico 会在控制台留一条 404 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237b5ea7'/%3E%3Ctext x='16' y='23' font-size='19' font-family='PingFang SC,Helvetica,sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3E%E8%91%A1%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+<div class="prototype-bar"><span><b>交互原型 v0.1.0</b> · 全部为模拟资料（患者人名为虚构）</span><span>仅本页演示 · 刷新重置 · 未接入真实 AI</span></div>
+<div class="workspace">
+  <aside class="sidebar" id="sidebar" aria-label="小葡宝业务导航">
+    <div class="brand"><div><strong>小葡宝</strong><span>GraPal · GTN 病程整理</span></div></div>
+    <nav id="nav" aria-label="一级导航"></nav>
+    <div class="sidebar-bottom"><span class="eyebrow">小 X 宝家族</span><p>数值自己看，<br>判断留给医生。</p></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="work-area">
+    <header class="topbar">
+      <button class="menu-btn" id="menu-btn" aria-label="打开导航菜单">☰</button>
+      <div class="breadcrumb">小葡宝工作台 <span>/</span> <b id="breadcrumb">看板</b></div>
+      <div class="top-actions">
+        <button class="status" id="store-status" data-action="open-store" aria-label="资料目录状态：已连接"><i></i><span>资料目录</span><b>已连接</b></button>
+        <button data-action="go-settings" aria-label="打开设置：资料目录、解析模式、临床参考数据包">⚙ 设置</button>
+      </div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="footer">小葡宝 · 与妊娠滋养细胞肿瘤患者和照护者一起整理、理解、准备沟通 <span class="ver-line"><b id="app-version">v0.1.0</b><em>2026-10-25</em></span></footer>
+  </div>
+</div>
+<dialog id="dialog" aria-labelledby="dialog-title">
+  <div class="dialog-head"><div><span class="eyebrow" id="dialog-eyebrow">小葡宝</span><h2 id="dialog-title"></h2></div><button class="icon-button" data-action="close" aria-label="关闭弹窗">×</button></div>
+  <div id="dialog-body" class="dialog-body"></div>
+  <div id="dialog-foot" class="dialog-foot"></div>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="demo-data.js"></script>
+<script src="app.js"></script>
+</body></html>

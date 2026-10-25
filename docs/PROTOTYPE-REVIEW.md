@@ -15,3 +15,44 @@
 | --- | --- | --- | --- | --- | --- |
 
 只确认对应版本/模块，新增/重大交互变更重新展示；确认不代表服务接通、数据库冻结或业务验收通过。实际数据模型/API复核后实现，参见docs/14-HTML-AND-DATA-CONTRACT.md。
+
+## M2 交互原型 v0.1.0（2026-10-25）骨架与自检
+
+依据：INTERACTION-DESIGN v1.0（页面树 / P1–P7 / CRUD 矩阵 / IP1–IP10）、SPEC v1.0、SCENARIOS v0.1、USER-RESEARCH v1.0；结构参照家族约定（脚手架 19/20/30/32 号），内容全部 GTN 原创。
+
+### 文件清单
+
+| 文件 | 说明 |
+|---|---|
+| public/index.html | 外壳：prototype-bar（全部为模拟资料）、侧栏 + 顶栏（资料目录状态 + ⚙ 设置齿轮）、内联 favicon |
+| public/style.css | 窄宽第一（默认单列/抽屉侧栏，≥1100px 双栏）、字号 12.5–15px、页脚贴底、[hidden] 控显隐 |
+| public/app.js | 8 个一级页视图、smoothPath（Fritsch–Carlson）对数轴 hCG 图、32 号折叠卡 + beforeprint、AI 草稿不自动发送守卫、数字键盘组件 |
+| public/demo-data.js | 唯一数据源：林小葡（虚构）完整旅程 15 点 hCG / 3 疗程 / FIGO 8 项 / 随访 3 月 / 版本链示例 |
+| scripts/check-prototype.mjs | 无头静态断言（X1/X2/IP8/黑名单/图表/守卫等 20 项），输出 JSON |
+
+### 关键实现决策
+
+- 数字输入选择：`inputmode="decimal"` + 自绘大按钮数字键盘组件（openKeypad），不用原生 number spinner（IP7 同源键盘）。
+- 「第 N 个月随访 hCG」：常量 `ENTRY_P4` 与文档逐字一致，渲染时 `replace('N', 月序)`。
+- 黑名单词形：`/正常(?!锚点)/`（唯一豁免「达正常锚点」固定词组）、`安全` 整词禁用（含组合词不出现）；详见 check 脚本注释。
+- 打印展开：beforeprint JS（32 号实测教训），CSS 只做辅助隐藏。
+
+### 检查结果（待复核填入）
+
+```
+$ node scripts/check-prototype.mjs
+# 待填：ok / total / 各项明细
+```
+
+- [ ] X1 孤儿页 = 0
+- [ ] X2 入口文案逐字一致（P1–P7）
+- [ ] IP8「不可恢复」= 0
+- [ ] 判读词黑名单 = 0
+- [ ] IP10 AI 草稿不自动发送
+- [ ] 浏览器实测：8 页渲染无报错、图表对数刻度/菱形标记/无参考带、拒收零副作用、beforeprint 展开、窄窗无横向溢出、抽屉开合
+
+### 用户确认（M2 范围）
+
+| 范围 | 确认人 | 日期 | 备注 |
+|---|---|---|---|
+| 待确认 | — | — | 未确认范围不进入正式业务开发 |
