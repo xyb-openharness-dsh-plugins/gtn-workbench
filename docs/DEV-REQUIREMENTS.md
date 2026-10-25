@@ -30,3 +30,12 @@
 ## 六、待决项
 
 - 随访日历锚点口径（hCG 达正常日期由用户自录，医嘱口径不预填）——M1 与医学核对一起定字段边界。
+
+## 七、本轮新坑追补（M9 ①，带来源，2026-10-25）
+
+1. "治愈后"结论词进系统文案（来源：M2 独立评审 P1）→ 已修，黑名单固化进 check-prototype.mjs。
+2. schema 事件枚举与实现命名漂移 plateau/rise vs platform/rebound（来源：M2 独立评审 P2#4）→ 已统一为 schema 口径。
+3. 用户中途扩页反馈导致移植返工（来源：M5 进行中用户反馈）→ 已落 ZERO-TO-DEV 开工前置；本仓 prototypes 快照冻结机制保证 parity 可重放。
+4. IAB 截图 surface 超时（来源：M2/M6 截图实操）→ 退路 playwright-core + 系统 Chrome。
+5. pnpm 无 TTY 安装（来源：M6 装机）→ CI=true + --no-frozen-lockfile。
+6. 界面加载无法自动化验证（来源：M6，本机 TCC 限制 + 单宿主布局）→ 如实挂账 RELEASE.md，待用户新建会话确认。

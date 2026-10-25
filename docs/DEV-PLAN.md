@@ -9,10 +9,10 @@
 | M2 | HTML 原型（demo 唯一源、32 折叠卡、30 窄宽、HVT X1–X4、agent-draft、独立评审 P0=0、README 6 实渲截图含收/展态） | ✅ v0.1.1（独立评审 2026-10-25：P0=0、P1 已修、P2#1/3/4/7/8 已修，#5/#6 记入 0002 待办；G2 用户未应答按推荐项继续，签认待补） |
 | M3 | schema/0001 + freeze-contract sha256 + 判读列断言 | ✅ 10 表冻结，断言 0 违规（G3 随原型签认） |
 | M4 | fetch-gtn-trials 四件套 | ✅ 6 条，一致性 6=6=6 |
-| M5 | 七步移植 + MinerU 六部件 + apiBase 定稿契约 + test 五套 + check 全绿 + HVT 一致性 | ⏳ |
-| M6 | 装机（四要素对照、corepack pnpm、真机走查、截图刷新） | ⏳ |
-| M7 | tag + release + CHANGELOG | ⏳ |
-| M8 | BACKLOG 回填（先 pull） | ⏳ |
-| M9 | 经验收敛回流 starter | ⏳ |
+| M5 | 七步移植 + MinerU 六部件 + apiBase 定稿契约 + test 五套 + check 全绿 + HVT 一致性 | ✅ v0.3.0（32 测试全绿）；临床匹配按 MATCHING-SPEC 重做 v0.4.0（三档，无百分比） |
+| M6 | 装机（四要素对照、corepack pnpm、真机走查、截图刷新） | 🔶 装机层 ✅（四要素/pnpm/bundles/重启）；界面加载待用户新建会话确认（如实） |
+| M7 | tag + release + CHANGELOG | ✅ v0.4.0 tag+Release（附 tgz+sha256） |
+| M8 | BACKLOG 回填（先 pull） | ✅ #57 状态列 🔵 v0.4.0 |
+| M9 | 经验收敛回流 starter | ✅ LESSONS 6 条 + ZERO-TO-DEV 开工前置 + CHANGELOG（starter c0bcc5d）；检查器待实施 2 项挂账 |
 
 闸口：G1（M1 后）、G2（M2 后）、G3（M3 后）、V1/V2/V3（M5/M6）需停下签认，不跳。
