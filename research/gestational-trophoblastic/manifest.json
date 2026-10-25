@@ -1,0 +1,57 @@
+{
+  "topic": "gtn",
+  "year": "2026",
+  "snapshotDate": "2026-10-25",
+  "tool": "unified-trial-mcp @ /Users/sammini/Downloads/unified_search_trials/dist/src/cli/main.js",
+  "queries": [
+    {
+      "keyword": "妊娠滋养细胞肿瘤",
+      "note": "中文标准名（GTN）"
+    },
+    {
+      "keyword": "滋养细胞肿瘤",
+      "note": "中文简称"
+    },
+    {
+      "keyword": "侵蚀性葡萄胎",
+      "note": "中文曾用名（恶性葡萄胎）"
+    },
+    {
+      "keyword": "绒毛膜癌",
+      "note": "中文曾用名（绒癌）"
+    },
+    {
+      "keyword": "妊娠滋养细胞疾病",
+      "note": "中文宽口径（GTD，含葡萄胎）"
+    },
+    {
+      "keyword": "gestational trophoblastic neoplasia",
+      "note": "英文标准名"
+    },
+    {
+      "keyword": "gestational trophoblastic tumor",
+      "note": "英文曾用名"
+    },
+    {
+      "keyword": "choriocarcinoma",
+      "note": "英文（绒癌）"
+    }
+  ],
+  "perSourceLimit": 200,
+  "recordCount": 6,
+  "dbCount": 6,
+  "sourceStatusRows": 48,
+  "honesty": {
+    "offlineCorpora": "ChiCTR/CDE/CTV 离线语料仅胰腺癌覆盖；GTN 只依赖在线通道终态，见 source_statuses 表；失败通道如实记\"未查过\"",
+    "statusWording": "登记 ≠ 有效 ≠ 安全 ≠ 可入组；状态一律\"登记状态，未核实\"",
+    "mergeRule": "仅同一登记号（NCT/ChiCTR/CDE 等）合并，其余并排保留来源"
+  },
+  "files": {
+    "trials-2026.jsonl": {
+      "sha256": "eaede19b98fe85d9a3ba20082b4eb65e04a9826bc152b6237de74d78ef243412"
+    },
+    "gtn_trials_2026.sqlite": {
+      "sha256": "8fde289d61eb8bbd6899fd36d7bb95cb7ef928421b39d6261b544788a81b9c40"
+    }
+  }
+}

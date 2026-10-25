@@ -25,4 +25,4 @@
 
 ## 临床试验库
 
-M4：`fetch-gtn-trials`（MCP stdio 四通道）→ manifest/jsonl/sqlite 四件套；manifest=jsonl=sqlite；FAILED 如实记"未查过"。
+M4 已完成（2026-10-25）：`scripts/fetch-gtn-trials-2026.mjs`（unified-trial-mcp v0.3.1，MCP stdio 四通道）→ research/gestational-trophoblastic/ 四件套（jsonl+sqlite+manifest+脚本）。实测 6 条（chinadrugtrials SUCCESS）；ictrp FAILED、chictr_online NOT_ENABLED、ctv NEEDS_SETUP——如实入库"未查过"（source_statuses 48 行）。一致性断言 manifest=jsonl=sqlite=6 ✅。

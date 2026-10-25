@@ -7,8 +7,8 @@
 | M0 | 领取 #38 + init + 9 文档骨架 + 接线前置（cordis root）+ staticPass | ✅ |
 | M1 | 三路调研（医学核数/用户研究/家族对比）→ DIFF-MATRIX 实测 + SPEC/USER-RESEARCH/INTERACTION-DESIGN 全量 | ✅ 2026-10-25（G1 闸口用户未应答，按可回退推荐项继续，**签认待补**） |
 | M2 | HTML 原型（demo 唯一源、32 折叠卡、30 窄宽、HVT X1–X4、agent-draft、独立评审 P0=0、README ≥4 实渲截图） | ⏳ |
-| M3 | schema/0001 + freeze-contract sha256 + 判读列断言 | ⏳ |
-| M4 | fetch-gtn-trials 四件套 | ⏳ |
+| M3 | schema/0001 + freeze-contract sha256 + 判读列断言 | ✅ 10 表冻结，断言 0 违规（G3 随原型签认） |
+| M4 | fetch-gtn-trials 四件套 | ✅ 6 条，一致性 6=6=6 |
 | M5 | 七步移植 + MinerU 六部件 + apiBase 定稿契约 + test 五套 + check 全绿 + HVT 一致性 | ⏳ |
 | M6 | 装机（四要素对照、corepack pnpm、真机走查、截图刷新） | ⏳ |
 | M7 | tag + release + CHANGELOG | ⏳ |
