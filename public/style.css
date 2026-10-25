@@ -115,7 +115,7 @@ code { font-size: 12.5px; background: var(--brand-soft); padding: 1px 6px; borde
 .empty h3 { color: var(--ink-2); font-size: .95rem; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 button { font: inherit; cursor: pointer; }
-button:not(.chip):not(.keypad button):not(.menu-btn):not(.icon-button):not(.task-entry):not(#nav button) {
+button:not(.chip):not(.keypad button):not(.menu-btn):not(.icon-button):not(.task-entry):not(#nav button):not(.mcard) {
   background: var(--action); color: #fff; border: 0; border-radius: var(--radius-sm);
   padding: 9px 16px; min-height: 44px; font-size: .9rem;
 }
@@ -259,3 +259,48 @@ dialog::backdrop { background: rgba(43, 36, 52, .35); backdrop-filter: blur(2px)
 .dash-grid { display: grid; grid-template-columns: 1fr; gap: 0; min-width: 0; }
 
 :focus-visible { outline: 3px solid var(--brand-deep); outline-offset: 2px; }
+
+/* ============ 指标分类 3D 翻转卡（照乳腺癌基准 .mcard 写法） ============
+   perspective 容器 → preserve-3d 内层 → aria-pressed 时 rotateY(180deg)；
+   双面 backface-visibility:hidden；按钮原生键盘可达（Enter/Space 触发 click）。 */
+.mgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, minmax(0, 1fr))); gap: 10px; min-width: 0; }
+.mcard { perspective: 1200px; -webkit-perspective: 1200px; display: block; width: 100%; height: 176px; padding: 0; border: 0; background: none; text-align: left; border-radius: 16px; min-height: 0; }
+.mcard:hover { background: none; filter: none; }
+.mcard-inner { position: relative; display: block; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform .62s cubic-bezier(.2, .72, .2, 1); will-change: transform; }
+.mcard[aria-pressed="true"] .mcard-inner { transform: rotateY(180deg); }
+.mface { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+.mcard:hover .mface { border-color: var(--line-strong); box-shadow: var(--shadow); }
+.mface .cat { font-size: 12.5px; letter-spacing: .08em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.mface .cat i { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); }
+.mface .name { font-size: 1rem; font-weight: 600; color: var(--ink); margin-top: 8px; }
+.mface .val { font-size: 1.2rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; margin-top: 4px; color: var(--brand-deep); overflow-wrap: anywhere; }
+.mface .rec { font-size: 12.5px; color: var(--ink-2); margin-top: auto; padding-top: 6px; }
+.mface .meta { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.mface .hint { color: var(--muted); }
+.mface.back { transform: rotateY(180deg); background: linear-gradient(165deg, var(--brand-soft), var(--surface)); }
+.mface.back .note { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; overflow-wrap: anywhere; }
+.mface.back .count { font-size: 12.5px; color: var(--muted); margin-top: auto; padding-top: 6px; }
+.mface.back .go { font-size: 12.5px; color: var(--action); font-weight: 600; }
+
+/* ============ 一图秀阶段条 ============ */
+svg.chart .stage { fill: var(--brand-soft); stroke: var(--line-strong); }
+svg.chart .stage-name { font-size: 13px; fill: var(--brand-deep); font-weight: 600; }
+svg.chart .stage-link { stroke: var(--line-strong); stroke-width: 2; fill: none; }
+svg.chart .ev-label { font-size: 12.5px; fill: var(--ink-2); }
+svg.chart.weight-spark { min-width: 0; }
+
+/* ============ 随访月历格子 ============ */
+.cal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, minmax(0, 1fr))); gap: 8px; min-width: 0; }
+.cal-cell { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cal-cell b { font-size: .89rem; }
+.cal-cell span { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.cal-cell.hit { background: var(--surface); position: relative; }
+.cal-cell.due { border-color: var(--warn); background: #fdf9f2; }
+.cal-cell.later { border-style: dashed; color: var(--muted); background: #f5f3f7; }
+.cal-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--brand-deep); margin-top: 4px; }
+.legend .line-chip .cal-dot { margin-top: 0; }
+
+/* ============ 分节标题（section_titles 心智） ============ */
+.subhead { font-size: 12.5px; font-weight: 600; color: var(--brand-deep); letter-spacing: .06em; margin: 12px 0 2px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.subhead:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+.section-titles { margin: 0 0 8px; }

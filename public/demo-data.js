@@ -4,7 +4,7 @@
    旅程：葡萄胎清宫（2026-03-12）→ hCG 周序列（15 点，含一次平台期事件与最终锚点）
         → 3 个 MTX 单药疗程 → hCG 达正常锚点（2026-06-22，用户勾选）→ hCG 达正常锚点后按月随访 3 条。 */
 window.DEMO_DATA = {
-  meta: { version: '0.1.0', build: '2026-10-25', family: '小 X 宝家族' },
+  meta: { version: '0.2.0', build: '2026-10-25', family: '小 X 宝家族' },
   patient: {
     name: '林小葡', age: 29,
     headline: '29 岁 · 葡萄胎清宫后化疗 3 疗 · hCG 达正常锚点（你勾选）后随访第 3 个月（人名虚构，数据全部模拟）'
@@ -109,6 +109,65 @@ window.DEMO_DATA = {
         fields: { '日期': '2026-10-20', '数值': '0.5', '单位': 'IU/L', '医院': '市一医院' } }
     ]
   },
+  /* 营养支持：化疗期饮食记录（口腔溃疡影响按用户自述记录；叶酸补充只按医嘱记录，不写建议） */
+  nutrition: {
+    note: 'MTX（甲氨蝶呤）为叶酸拮抗类化疗药；叶酸 / 亚叶酸补充与否、剂量与时机，只照医嘱原文记录，本工具不生成任何补充建议。',
+    meals: [
+      { d: '2026-04-20', meal: '早餐', intake: '白粥半碗', ulcer: '有', ulcerNote: '溃疡第二天，咸的辣的都不敢碰，温凉的最能咽', folate: '按医嘱未服（化疗日）' },
+      { d: '2026-04-20', meal: '午餐', intake: '蒸蛋 1 份 + 米汤', ulcer: '有', ulcerNote: '吸管喝的汤，固体只吃了几口', folate: '按医嘱未服（化疗日）' },
+      { d: '2026-04-22', meal: '早餐', intake: '牛奶泡软面包', ulcer: '有', ulcerNote: '比昨天好一点', folate: '按医嘱服用（剂量照出院指导）' },
+      { d: '2026-04-25', meal: '午餐', intake: '软面条 1 碗 + 鱼汤', ulcer: '无', ulcerNote: '', folate: '按医嘱服用' },
+      { d: '2026-05-12', meal: '早餐', intake: '粥 + 鸡蛋 1 个', ulcer: '无', ulcerNote: '第二疗开始日，胃口一般', folate: '按医嘱未服（化疗日）' },
+      { d: '2026-05-16', meal: '晚餐', intake: '排骨汤面 + 香蕉 1 根', ulcer: '无', ulcerNote: '', folate: '按医嘱服用' },
+      { d: '2026-06-02', meal: '午餐', intake: '米饭半碗 + 清蒸鱼 + 青菜', ulcer: '无', ulcerNote: '第三疗期间，吃得比前两疗多', folate: '按医嘱未服（化疗日）' }
+    ],
+    weight: [
+      { d: '2026-04-18', v: 54.2 }, { d: '2026-04-30', v: 52.8 },
+      { d: '2026-05-15', v: 53.1 }, { d: '2026-06-01', v: 53.6 }, { d: '2026-10-20', v: 55.0 }
+    ],
+    quote: '「化疗那周嘴里破了，吃什么我得记下来问医生。」（改写句 · 0 访谈）'
+  },
+  /* 心理支持：情绪日记（三态）、等 hCG 报告日焦虑（GTN 特异）、家庭沟通；默认私密（仅本机） */
+  mind: {
+    moods: [
+      { d: '2026-03-13', state: 'down', text: '清宫手术后第一天，看到病理单上的词，一个人在走廊坐了很久。' },
+      { d: '2026-04-20', state: 'flat', text: '第一疗开始，反而踏实一点，总觉得在往前走。' },
+      { d: '2026-06-25', state: 'ok', text: '数值走到很低了，医生说按计划随访，回家路上买了杯奶茶。' },
+      { d: '2026-09-22', state: 'flat', text: '随访第 3 个月，抽血已经成习惯了。' },
+      { d: '2026-10-24', state: 'ok', text: '把病历整理进这个工作台，感觉一年的事终于理顺了。' }
+    ],
+    waitDays: [
+      { d: '2026-06-23', text: '昨天抽的血，今天下午出报告。从早上就反复看手机，饭也没心思做。', cope: '把手机放客厅，去阳台浇了花' },
+      { d: '2026-09-22', text: '随访抽血日。等结果的两个小时里在门诊楼下走了四圈。', cope: '提前约了妈妈陪我来，出报告前她一直拉着我的手' }
+    ],
+    family: [
+      { d: '2026-03-20', who: '丈夫', text: '跟他讲清楚了"葡萄胎不是我想留住就能留住的孩子"，他沉默了一会儿，说先把我照顾好。' },
+      { d: '2026-05-02', who: '妈妈', text: '妈妈总问"什么时候能再要孩子"，我说要按随访节奏来，让她别催；她答应了但还是会念。' },
+      { d: '2026-06-28', who: '丈夫', text: '一起看那条往下走的线，他说"你看，你在变好"。这句话我记下来。' }
+    ],
+    resources: [],
+    quote: '「等结果那两天比化疗还难熬。」（改写句 · 0 访谈）'
+  },
+  /* 临床研究：research/gestational-trophoblastic/trials-2026.jsonl 真实登记摘录快照（6 条，2026-10-25 抓取） */
+  trials: {
+    sourceLabel: '中国药物临床试验登记平台（chinadrugtrials）',
+    disclaimer: '登记 ≠ 有效 ≠ 可入组：此处仅摘录公开登记字段，状态均为「登记状态，未核实」，是否适合参与请与你的主诊医生和研究方核实。',
+    items: [
+      { recordId: 'CTR20192427', title: '甲氨蝶呤片人体生物等效性试验', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' },
+      { recordId: 'CTR20220792', title: '甲氨蝶呤片在中国健康受试者中进行的人体生物等效性试验', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' },
+      { recordId: 'CTR20222562', title: '甲氨蝶呤片人体生物等效性试验', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' },
+      { recordId: 'CTR20222621', title: '甲氨蝶呤片在中国健康受试者中进行的人体生物等效性试验', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' },
+      { recordId: 'CTR20252681', title: '评价注射用莱古比星联合用药在晚期卵巢癌和单药在晚期复发性/难治性绒毛膜癌受试者中的安全性、耐受性、药代动力学特征及初步有效性的多中心、开放的Ib/IIa期临床研究', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' },
+      { recordId: 'CTR20263587', title: '甲氨蝶呤片空腹及餐后人体生物等效性研究', sponsor: '未在摘录字段中公开', status: '登记状态，未核实', source: '中国药物临床试验登记平台', url: 'https://www.chinadrugtrials.org.cn/clinicaltrials.searchlistdetail.dhtml' }
+    ]
+  },
+  /* 指标分类（3D 翻转卡正面：最近值 + 次数；背面：说明 + 去记录）。分类不进趋势图：只有 hCG 数值序列画线。 */
+  metricCats: [
+    { key: 'hcg', name: 'hCG 序列', latest: '2026-10-20 · 0.5 IU/L', count: 16, note: '血 hCG 逐次记录（日期 / 数值 / 单位 / 来源），唯一画成曲线的数值序列；事件标记由你勾选。', go: 'hcg', goLabel: '去 hCG 时间线记录' },
+    { key: 'cbc', name: '血常规', latest: '第 3 疗第 14 天 · 白细胞 3.5×10⁹/L', count: 3, note: '每疗后血象复查照抄（白细胞 / 中性粒细胞 / 血小板 / 血红蛋白），仅陈列数值，不判高低。', go: 'treatment', goLabel: '在疗程卡里记血象' },
+    { key: 'liver', name: '肝肾功能', latest: '2026-06-10 · 按出院小结摘录', count: 2, note: '化疗前后肝肾功能化验单逐项照抄入档；数值原文不改写、不做分级对照。', go: 'import', goLabel: '去导入化验单' },
+    { key: 'imaging', name: '影像随访', latest: '2026-04-15 · 胸部 CT 平扫', count: 2, note: '超声 / CT 等影像报告只做原文摘录（报告日期 / 医院 / 结论原文），不改写、不判读。', go: 'diagnosis', goLabel: '去诊断档案看摘录' }
+  ],
   /* 设置页初始值 */
   settings: {
     dir: '/Users/linxiaopu/Documents/葡萄胎资料（演示路径）',

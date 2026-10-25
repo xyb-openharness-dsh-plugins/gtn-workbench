@@ -14,3 +14,9 @@
 10 张表：档案级 2（subjects / section_titles）＋事实四层前两层（documents / candidates）＋GTN 专属 5（hcg_rows / chemo_cycles / pregnancy_rows / figo_rows / followup_rows）＋通用 3（viewpoints / question_rows / guideline_sources）＋demo_meta。
 
 **判读列断言（check-schema 强制）**：全库列名禁 diagnosis / risk_level / severity / grade_judgement / is_abnormal / is_normal / conclusion；figo_rows 不存总分列（读模型求和）；hcg_rows.event_mark 只存用户勾选值。
+
+| `0002_dev.sql` | 4986bdc308880be9969bab273fd80f130f9c12fcc4bb5990715e1efb04da0411 |
+
+## 0002 内容边界（M5 开发版，2026-10-25 追加）
+
+新增 pathology_rows 表 + 8 张表追加列（hcg_rows/chemo_cycles 更正链元数据、pregnancy_rows 展示字段、followup_rows.hcg_text 原文、candidates 文件与字段 JSON）。无判读列；不改不删 0001 任何定义。

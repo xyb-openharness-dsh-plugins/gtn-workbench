@@ -18,24 +18,26 @@ const doc = read('docs/INTERACTION-DESIGN.md');
 const results = [];
 const check = (id, ok, detail) => results.push({ id, ok: !!ok, detail });
 
-/* ---------- X1 孤儿页：nav keys × 路径表（P1–P7）双向覆盖 ---------- */
+/* ---------- X1 孤儿页：nav keys × 路径表（P1–P10）双向覆盖 ---------- */
 const navMatch = app.match(/const PAGES = \[([\s\S]*?)\];/);
 const navKeys = navMatch ? Array.from(navMatch[1].matchAll(/\['([a-z]+)'/g), (m) => m[1]) : [];
 /* 页面树（INTERACTION-DESIGN §0）× 场景路径（§1）的 view→路径映射（文档两表合并） */
 const EXPECTED = {
-  dashboard: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'],  // 看板是 P1–P6 的入口宿主 + P7 回首页
+  dashboard: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10'],  // 看板是 P1–P10 的入口宿主
   hcg: ['P1'], treatment: ['P2'], diagnosis: ['P3'], followup: ['P4'],
-  import: ['P5'], review: ['P6'], settings: ['P7']
+  import: ['P5'], review: ['P6'], settings: ['P7'],
+  nutrition: ['P8'], mind: ['P9'], trials: ['P10'],
+  oneshow: ['P1']   // 一图秀与 hCG 时间线同源（P1 数值线的全程视图）
 };
 const orphans = Object.keys(EXPECTED).filter((k) => !navKeys.includes(k))
   .concat(navKeys.filter((k) => !(k in EXPECTED)));
-check('X1-orphan-pages', orphans.length === 0 && navKeys.length === 8,
+check('X1-orphan-pages', orphans.length === 0 && navKeys.length === 12,
   { navKeys, expected: Object.keys(EXPECTED), orphans, navCount: navKeys.length });
 
 /* ---------- X2 入口文案逐字一致（INTERACTION-DESIGN §1 入口列 vs app.js） ----------
-   入口列形如「接下来」卡「本周 hCG 复查」：取每行 P1–P6 入口列最后一个「…」段为入口动作文案；
+   入口列形如「接下来」卡「本周 hCG 复查」：取每行 P1–P10 入口列最后一个「…」段为入口动作文案；
    P7 入口=各业务页右上齿轮（无引号串），改按「⚙ 设置」按钮断言。 */
-const entryRows = doc.split('\n').filter((l) => /^\|\s*P[1-7]\//.test(l));
+const entryRows = doc.split('\n').filter((l) => /^\|\s*P\d+\//.test(l));
 const entries = [];
 for (const line of entryRows) {
   const cells = line.split('|').map((c) => c.trim());   // cells[1]=场景, cells[2]=入口
@@ -47,7 +49,7 @@ for (const line of entryRows) {
 const missing = entries.filter((e) => !app.includes(e.text));
 /* 「第 N 个月随访 hCG」的 N 为文档占位符：常量本体逐字一致，渲染时 replace('N', 月序)。 */
 const usesP4 = /ENTRY_P4\.replace\('N'/.test(app);
-check('X2-entry-text', missing.length === 0 && usesP4 && entries.length === 7,
+check('X2-entry-text', missing.length === 0 && usesP4 && entries.length === 10,
   { entries, missing, p4TemplateRender: usesP4 });
 
 /* ---------- IP8：全站禁「不可恢复」 ---------- */
@@ -73,7 +75,10 @@ const BLACKLIST = [
   [/复发风险/g, '复发风险']
 ];
 const blHits = [];
-for (const [file, src] of Object.entries({ 'public/app.js': app, 'public/demo-data.js': data, 'public/index.html': html, 'public/style.css': css })) {
+/* 豁免：demo-data.js 临床研究块内 recordId 行是登记平台原文逐字摘录（trials-jsonl-sync 断言其与
+   research/*.jsonl 一致），标题里可能出现「安全性」等词形；原文摘录不改写，黑名单只查工具自写文案。 */
+const dataExExcerpt = data.split('\n').filter((l) => !/recordId:/.test(l)).join('\n');
+for (const [file, src] of Object.entries({ 'public/app.js': app, 'public/demo-data.js': dataExExcerpt, 'public/index.html': html, 'public/style.css': css })) {
   for (const [re, label] of BLACKLIST) {
     const m = src.match(re);
     if (m) blHits.push({ file, word: label, count: m.length });
@@ -115,6 +120,27 @@ check('decimal-keypad', /inputmode="decimal"/.test(app) && /data-keypad/.test(ap
 /* ---------- demo 数据完整性（林小葡旅程） ---------- */
 const pts = (data.match(/d: '\d{4}-\d{2}-\d{2}', v:/g) || []).length;
 check('demo-journey', data.includes('林小葡') && pts >= 13 && /plateau/.test(data) && /anchor/.test(data) && /rise/.test(data), { hcgPoints: pts });
+/* ---------- v0.2.0 新增：3D 指标分类卡 ---------- */
+check('flip-3d-card-css', /transform-style:\s*preserve-3d/.test(css) && /rotateY\(180deg\)/.test(css) && /backface-visibility:\s*hidden/.test(css), {});
+check('flip-3d-card-js', /data-action="flip"/.test(app) && /aria-pressed/.test(app) && /state\.flipped/.test(app), {});
+check('flip-cats-not-in-chart', /分类不进趋势图|分类卡只做归口，不进趋势图/.test(app) && (app.match(/metricCatGrid\(\)/g) || []).length >= 2, {});
+/* ---------- v0.2.0 新增：临床研究页读 trials jsonl ----------
+   demo-data.js 内嵌登记摘录快照必须与 research/gestational-trophoblastic/trials-2026.jsonl 逐条一致（登记号 + 题目）。 */
+let trialsLines = [];
+try { trialsLines = read('research/gestational-trophoblastic/trials-2026.jsonl').trim().split('\n').map((l) => JSON.parse(l)); } catch { /* 缺文件则记 0 条 */ }
+const trialsMatched = trialsLines.filter((r) => {
+  const rid = (r.registryNumbers || []).find((x) => x.primary)?.value || '';
+  return rid && data.includes(rid) && data.includes(r.title);
+});
+check('trials-jsonl-sync', trialsLines.length === 6 && trialsMatched.length === 6,
+  { jsonl: trialsLines.length, matched: trialsMatched.length });
+check('trials-disclaimer', app.includes('登记 ≠ 有效 ≠ 可入组') && data.includes('登记状态，未核实') && app.includes('未核实'), {});
+/* ---------- v0.2.0 新增：营养 / 心理 / 一图秀数据 ---------- */
+check('nutrition-mind-data',
+  (data.match(/d: '\d{4}-\d{2}-\d{2}', meal:/g) || []).length >= 7 &&
+  (data.match(/d: '\d{4}-\d{2}-\d{2}', state:/g) || []).length >= 5 &&
+  /waitDays/.test(data) && /口腔溃疡/.test(data) && /仅本机/.test(app), {});
+check('oneshow-chart', /function oneshowChart/.test(app) && /清宫/.test(app) && /达正常锚点（你勾选）/.test(app), {});
 
 const failed = results.filter((r) => !r.ok);
 const summary = { ok: failed.length === 0, total: results.length, failed: failed.length, checks: results, at: new Date().toISOString() };

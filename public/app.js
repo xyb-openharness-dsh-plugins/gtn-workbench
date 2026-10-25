@@ -1,29 +1,34 @@
 'use strict';
-/* 小葡宝 GraPal v0.1.1 — GTN 工作台交互原型（M2）。
+/* 小葡宝 GraPal v0.2.0 — GTN 工作台交互原型（M2，用户看板反馈版）。
    数据唯一来源：window.DEMO_DATA（demo-data.js，全部模拟）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.1.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.2.0', build: '2026-10-25' };
 const D = window.DEMO_DATA;
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/* ---------------- 导航（IP2：8 个一级页与 P1–P7 双向覆盖） ---------------- */
+/* ---------------- 导航（IP2：12 个一级页与 P1–P10 双向覆盖） ---------------- */
 const PAGES = [
-  ['dashboard', '看板'], ['hcg', 'hCG 时间线'], ['treatment', '治疗历程'],
-  ['diagnosis', '诊断档案'], ['followup', '随访日历'], ['import', '资料导入'],
-  ['review', '复诊准备'], ['settings', '设置']
+  ['dashboard', '看板'], ['hcg', 'hCG 时间线'], ['diagnosis', '诊断档案'],
+  ['treatment', '治疗历程'], ['followup', '随访日历'], ['oneshow', '病情一图秀'],
+  ['nutrition', '营养支持'], ['mind', '心理支持'], ['trials', '临床研究'],
+  ['import', '资料导入'], ['review', '复诊准备'], ['settings', '设置']
 ];
 const SUBTITLES = {
   dashboard: '接下来做什么、数值走到哪、疗程记到哪，一页看全。',
   hcg: '对数轴曲线 + 记录列表；事件由你勾选，工具不做判定。',
-  treatment: '每疗程一张折叠卡；改过就新增版本，旧值可查。',
   diagnosis: '末次妊娠档案、FIGO 评分自录（照抄原始分）、病理原文摘录。',
+  treatment: '每疗程一张折叠卡；改过就新增版本，旧值可查。',
   followup: '以你勾选的 hCG 达正常锚点为起点，按月记录。',
+  oneshow: '清宫 → hCG 序列 → 疗程 → 锚点 → 随访，一张图讲完病程。',
+  nutrition: '化疗期每餐记录、口腔溃疡期进食影响、体重序列；叶酸只按医嘱记录。',
+  mind: '情绪日记、等报告日的焦虑、家人沟通；私密记录仅本机。',
+  trials: '公开登记平台摘录（登记 ≠ 有效 ≠ 可入组），按来源筛选。',
   import: '上传报告 → 逐文件授权 → 候选核对 → 入档；拒收零副作用。',
   review: '勾选范围生成一份材料，与档案同源。',
   settings: '资料目录、解析模式与凭据状态、临床参考数据包来源与版本。'
@@ -38,6 +43,9 @@ const ENTRY_P3 = 'FIGO 评分留个底';
 const ENTRY_P4 = '第 N 个月随访 hCG';
 const ENTRY_P5 = '导入报告';
 const ENTRY_P6 = '复诊前准备';
+const ENTRY_P8 = '记一餐与口腔情况';
+const ENTRY_P9 = '写一条情绪记录';
+const ENTRY_P10 = '查登记研究';
 
 /* 患者原话占位句（USER-RESEARCH §患者原话占位，改写句 · 0 访谈） */
 const QUOTE = {
@@ -45,6 +53,8 @@ const QUOTE = {
   s2: '「第几疗、哪天上的药，别等我忘了。」（改写句 · 0 访谈）',
   s3: '「医生说的那些分期数字，我想留个底。」（改写句 · 0 访谈）',
   s4: '「说好查一年，哪个月该查我自己记不清。」（改写句 · 0 访谈）',
+  nutrition: '「化疗那周嘴里破了，吃什么我得记下来问医生。」（改写句 · 0 访谈）',
+  mind: '「等结果那两天比化疗还难熬。」（改写句 · 0 访谈）',
   none: '（本功能线暂无患者原话占位 · 0 访谈，M2 访谈后补）'
 };
 
@@ -59,7 +69,9 @@ const state = {
   parseMode: D.settings.parseMode,
   candDraft: null,
   keypad: null,              // { input, title }
-  pin: null                  // hCG 图选中的点
+  pin: null,                 // hCG 图选中的点
+  flipped: new Set(),        // 已翻转的指标分类卡（key 集合）
+  trialFilter: 'all'         // 临床研究来源筛选：all | chinadrugtrials
 };
 let uidSeq = 0;
 const uid = (p) => p + (++uidSeq);
@@ -91,6 +103,37 @@ function agentPane(promptText) {
       </div>
     </div>
     <p class="muted small">演示原型未接入真实 AI；「发送」仅提示已发送动作，不产生回复。</p>
+  </section>`;
+}
+
+/* ---------------- 指标分类 3D 翻转卡（看板 + hCG 时间线） ----------------
+   写法照乳腺癌基准（.mcard）：perspective 容器 + preserve-3d 内层 + rotateY(180deg) 翻面，
+   backface-visibility:hidden 双面；按钮原生 Enter/Space 触发 click，键盘可达；
+   aria-pressed 同步翻转态。分类不进趋势图：只有 hCG 数值序列画曲线（见 chart-log-axis 断言）。 */
+function metricCatCard(c) {
+  const flipped = state.flipped.has(c.key);
+  return `<button class="mcard" data-action="flip" data-key="${c.key}" aria-pressed="${flipped}" aria-label="指标分类：${esc(c.name)}，最近 ${esc(c.latest)}，共 ${c.count} 次；点按或回车翻到背面看记录说明">
+    <span class="mcard-inner">
+      <span class="mface front" aria-hidden="true">
+        <span class="cat"><i></i>指标分类</span>
+        <span class="name">${esc(c.name)}</span>
+        <span class="val">${esc(c.latest)}</span>
+        <span class="rec">已记录 ${c.count} 次</span>
+        <span class="meta"><span>点按 / 回车翻转</span><span class="hint">↻</span></span>
+      </span>
+      <span class="mface back" aria-hidden="true">
+        <span class="name">${esc(c.name)} · 记录说明</span>
+        <span class="note">${esc(c.note)}</span>
+        <span class="count">本分类不画曲线（仅 hCG 数值序列画线）</span>
+        <span class="go">${esc(c.goLabel)} →</span>
+      </span>
+    </span>
+  </button>`;
+}
+function metricCatGrid() {
+  return `<section class="card"><div class="card-head"><h2>指标分类（点卡片翻转）</h2><span class="muted">四类 · 正面看最近值，背面看说明与入口</span></div>
+    <div class="mgrid">${D.metricCats.map(metricCatCard).join('')}</div>
+    <p class="muted small">分类卡只做归口，不进趋势图；血 hCG 曲线在「hCG 时间线」页。</p>
   </section>`;
 }
 
@@ -168,6 +211,12 @@ function vDashboard() {
   const nextN = latestMonth.n + 1;
   const entryP4 = ENTRY_P4.replace('N', String(nextN));   // 「第 4 个月随访 hCG」
   const lastCycle = D.cycles[D.cycles.length - 1];
+  /* 最近记录流：跨页混排的最新 6 条事实层记录（数值只陈述） */
+  const feed = [
+    ...D.hcg.points.slice(-4).map(p => ({ d: p.d, t: '血 hCG', s: `${p.v} ${D.hcg.unit} · ${p.src}${p.event ? ' · 事件（你勾选）：' + EVENT_LABEL[p.event] : ''}`, go: 'hcg' })),
+    { d: D.mind.moods[D.mind.moods.length - 1].d, t: '情绪日记', s: '一条私密记录 · 仅本机', go: 'mind' },
+    { d: D.nutrition.weight[D.nutrition.weight.length - 1].d, t: '体重', s: `${D.nutrition.weight[D.nutrition.weight.length - 1].v} kg · 手工记录`, go: 'nutrition' }
+  ].sort((a, b) => (a.d < b.d ? 1 : -1)).slice(0, 6);
   return `${pageHead('dashboard')}
   <section class="hero"><div>
     <span class="eyebrow">演示档案 · ${esc(D.patient.headline)}</span>
@@ -175,6 +224,7 @@ function vDashboard() {
     <p>数值只陈述记录，不给判定；怎么解读问你的主诊医生。</p>
   </div></section>
 
+  ${metricCatGrid()}
   <div class="dash-grid">
     <div class="col">
       <div class="card accent"><div class="card-head"><h2>接下来</h2><span class="muted">按医嘱节奏</span></div>
@@ -210,6 +260,17 @@ function vDashboard() {
         <div class="rows">${row('记疗程', '每疗一张折叠卡，收起看概要，展开看详情')}</div>
         <div class="actions"><button data-action="go" data-arg="treatment">${esc(ENTRY_P2)}</button></div>
       </div>
+      <div class="card"><div class="card-head"><h2>最近记录流</h2><span class="muted">跨页混排 · 最新 ${feed.length} 条</span></div>
+        <div class="rows">${feed.map(f => row(`${esc(f.d)} · ${esc(f.t)}`, esc(f.s), `<button class="text-button" data-action="go" data-arg="${f.go}">去看</button>`)).join('')}</div>
+      </div>
+      <div class="card"><div class="card-head"><h2>支持线</h2><span class="muted">营养 / 心理 / 研究</span></div>
+        <div class="rows">
+          ${row('营养支持', `每餐记录 ${D.nutrition.meals.length} 条 · 体重 ${D.nutrition.weight.length} 点`)}
+          ${row('心理支持', `情绪 ${D.mind.moods.length} 条 · 等报告日 ${D.mind.waitDays.length} 条 · 私密仅本机`)}
+          ${row('临床研究', `登记摘录 ${D.trials.items.length} 条 · 登记状态，未核实`)}
+        </div>
+        <div class="actions"><button data-action="go" data-arg="nutrition">${esc(ENTRY_P8)}</button><button class="soft" data-action="go" data-arg="mind">${esc(ENTRY_P9)}</button><button class="soft" data-action="go" data-arg="trials">${esc(ENTRY_P10)}</button></div>
+      </div>
     </div>
   </div>
   ${agentPane('请帮我把本周看板整理成一段给家人看的近况说明：末次妊娠类型、3 个疗程的起止、最近一次血 hCG 数值与日期。只陈述记录，不做任何判定。')}`;
@@ -227,6 +288,7 @@ function hcgRow(p) {
 
 function vHcg() {
   return `${pageHead('hcg')}
+  ${metricCatGrid()}
   <div class="card chart-card"><div class="card-head"><h2>血 hCG 时间线</h2><span class="muted">对数轴 · 无参考区间带</span></div>
     <div class="chart-wrap">${hcgChart()}</div>
   </div>
@@ -292,7 +354,13 @@ function vDiagnosis() {
     ${quoteLine(QUOTE.s3)}
   </div>
   <div class="card"><div class="card-head"><h2>病理与影像原文摘录</h2>${pill('仅摘录 · 不判读', 'grey')}</div>
-    <div class="rows">${D.pathology.map(x => row(esc(x.src), esc(x.text))).join('')}</div>
+    <div class="section-titles muted small">分节：病理 / 影像 · 每条保留报告日期与医院，原文不改写</div>
+    <div class="rows">
+      <div class="subhead">病理</div>
+      ${D.pathology.filter(x => x.src.includes('病理')).map(x => row(esc(x.src), esc(x.text))).join('')}
+      <div class="subhead">影像</div>
+      ${D.pathology.filter(x => !x.src.includes('病理')).map(x => row(esc(x.src), esc(x.text))).join('')}
+    </div>
   </div>
   <div class="card"><div class="card-head"><h2>随访口径出处（切换）</h2></div>${sourceSwitch()}</div>
   ${agentPane('请帮我从出院小结的照片里定位 FIGO 评分 8 个项目的原始分（只定位字段与数字，不估算、不求和、不分级），逐项列出候选等我照抄核对。')}`;
@@ -321,8 +389,18 @@ function vFollowup() {
     }
     return `<div class="month-row future" aria-disabled="true"><div><b>第 ${m.n} 个月</b><span class="muted">未到月（约 ${esc(m.due)}）· 置灰不可预填</span></div></div>`;
   }).join('');
+  /* 月历格子视图：一格一月，打点=已记录，描边=已到期未记录，虚线=未到月 */
+  const grid = months.map(m => {
+    const cls = m.rec ? 'hit' : m.reached ? 'due' : 'later';
+    const mark = m.rec ? `hCG ${esc(m.rec.hcg)} ${D.hcg.unit}` : m.reached ? '已到期待记录' : `约 ${esc(m.due)}`;
+    return `<div class="cal-cell ${cls}"><b>第 ${m.n} 月</b><span>${esc(mark)}</span>${m.rec ? '<i class="cal-dot"></i>' : ''}</div>`;
+  }).join('');
   return `${pageHead('followup')}
   <div class="notice">随访月份以 <b>${esc(f.anchorLabel)} · ${esc(f.anchor)}</b> 为锚点生成；未到月置灰，不提供预填。这里不输出任何关于再生育时机的结论，避孕与再生育安排以你的医嘱为准。</div>
+  <div class="card"><div class="card-head"><h2>月历总览（${f.planMonths} 个月）</h2><span class="muted">格视图 · 打点=已记录</span></div>
+    <div class="cal-grid">${grid}</div>
+    <p class="legend"><span class="line-chip"><i class="cal-dot"></i>已记录</span><span class="line-chip">描边格=已到期未记录</span><span class="line-chip">虚线格=未到月</span></p>
+  </div>
   <div class="card"><div class="card-head"><h2>随访月记录（${f.months.length} / ${f.planMonths} 个月）</h2><div class="head-actions">${moreMenu([{ action: 'add-month', label: '手工补录某月（需已到期）' }, { action: 'ai-cand-month', label: 'AI：上传当月化验单出候选' }])}</div></div>
     <div class="months">${list}</div>
     ${quoteLine(QUOTE.s4)}
@@ -378,10 +456,11 @@ function vReview() {
   if (state.reviewPreview) {
     const last = D.hcg.points[D.hcg.points.length - 1];
     preview = `<div class="card accent"><div class="card-head"><h2>材料预览（与档案同源）</h2>${pill('演示生成', 'violet')}</div>
-      ${sel.hcg ? `<h3>血 hCG 时间线</h3><div class="rows">${row('记录范围', `${D.hcg.points[0].d} → ${last.d}，共 ${D.hcg.points.length} 点`)}${row('最近一次', `${last.d} · ${last.v} ${D.hcg.unit}`)}${row('事件标记', D.hcg.points.filter(p => p.event).map(p => `${p.d} ${EVENT_LABEL[p.event]}`).join('；') || '无')}</div>` : ''}
-      ${sel.cycles ? `<h3>疗程</h3><div class="rows">${D.cycles.map(c => row(`第 ${c.n} 疗 · ${esc(c.regimen)}`, `${c.start} → ${c.end} · 当日 hCG ${c.hcgOnDay} ${D.hcg.unit}`)).join('')}</div>` : ''}
-      ${sel.figo ? `<h3>FIGO 评分自录（照抄）</h3><div class="rows">${D.figo.map(it => row(esc(it.k), `${esc(it.opts[it.picked])} · ${it.picked} 分`)).join('')}${row('总分（自动求和）', String(figoTotal()) + ' · 总分求和不代表分级建议')}</div>` : ''}
-      ${sel.questions ? `<h3>问题清单</h3><div class="rows">${D.questions.map((q, i) => row(`${i + 1}. ${esc(q)}`, '')).join('')}</div>` : ''}
+      <div class="section-titles muted small">材料分节：数值 → 疗程 → 评分 → 问题清单；与各业务页同源渲染</div>
+      ${sel.hcg ? `<h3 class="subhead">数值 · 血 hCG 时间线</h3><div class="rows">${row('记录范围', `${D.hcg.points[0].d} → ${last.d}，共 ${D.hcg.points.length} 点`)}${row('最近一次', `${last.d} · ${last.v} ${D.hcg.unit}`)}${row('事件标记', D.hcg.points.filter(p => p.event).map(p => `${p.d} ${EVENT_LABEL[p.event]}`).join('；') || '无')}</div>` : ''}
+      ${sel.cycles ? `<h3 class="subhead">疗程 · 折叠卡展开</h3><div class="rows">${D.cycles.map(c => row(`第 ${c.n} 疗 · ${esc(c.regimen)}`, `${c.start} → ${c.end} · 当日 hCG ${c.hcgOnDay} ${D.hcg.unit}`)).join('')}</div>` : ''}
+      ${sel.figo ? `<h3 class="subhead">评分 · FIGO 自录（照抄）</h3><div class="rows">${D.figo.map(it => row(esc(it.k), `${esc(it.opts[it.picked])} · ${it.picked} 分`)).join('')}${row('总分（自动求和）', String(figoTotal()) + ' · 总分求和不代表分级建议')}</div>` : ''}
+      ${sel.questions ? `<h3 class="subhead">问题清单</h3><div class="rows">${D.questions.map((q, i) => row(`${i + 1}. ${esc(q)}`, '')).join('')}</div>` : ''}
     </div>`;
   }
   return `${pageHead('review')}
@@ -425,7 +504,152 @@ function vSettings() {
   ${agentPane('请帮我检查设置页有没有漏项：资料目录、解析模式、凭据状态、三个临床参考数据包来源与版本，各列一行。')}`;
 }
 
-const VIEWS = { dashboard: vDashboard, hcg: vHcg, treatment: vTreatment, diagnosis: vDiagnosis, followup: vFollowup, import: vImport, review: vReview, settings: vSettings };
+/* ---------------- 病情一图秀（16 号 one-chart：一张图讲完病程） ---------------- */
+function oneshowChart() {
+  const stages = [
+    { x: 20, w: 120, name: '清宫', span: '2026-03-12' },
+    { x: 140, w: 320, name: 'hCG 序列（周查）', span: '03-16 → 06-22 · 16 点' },
+    { x: 460, w: 300, name: 'MTX 单药 × 3 疗', span: '04-20 → 06-19' },
+    { x: 760, w: 180, name: '锚点后随访', span: '2026-07 → 至今' }
+  ];
+  const bar = stages.map((s, i) => `<g><rect class="stage" x="${s.x}" y="120" width="${s.w}" height="40" rx="8"/>
+    <text class="stage-name" x="${s.x + s.w / 2}" y="145" text-anchor="middle">${esc(s.name)}</text>
+    <text class="tick" x="${s.x + s.w / 2}" y="180" text-anchor="middle">${esc(s.span)}</text></g>`).join('');
+  /* 关键事件点：均"由你勾选 / 档案自述"口径，工具不做判定 */
+  const events = [
+    { x: 80, y: 120, label: '清宫（档案自述）', tip: '2026-03-12 · 完全性葡萄胎清宫 · 市一医院' },
+    { x: 300, y: 120, label: '平台期（你勾选）', tip: '2026-04-20 · 8800 IU/L · 事件标记由你勾选' },
+    { x: 445, y: 120, label: 'hCG 反弹（你勾选）', tip: '2026-06-01 · 512 IU/L · 事件标记由你勾选' },
+    { x: 750, y: 120, label: 'hCG 达正常锚点（你勾选）', tip: '2026-06-22 · 6 IU/L · 随访月以此为起点' },
+    { x: 800, y: 120, label: '随访 3 个月', tip: '2026-07/08/09 · 各月 hCG 已记录' }
+  ];
+  const dots = events.map(e => `<path class="ev" d="M ${e.x} ${e.y - 26} l6 6 -6 6 -6 -6 Z"><title>${esc(e.tip)}</title></path>
+    <text class="ev-label" x="${e.x}" y="${e.y - 36}" text-anchor="middle">${esc(e.label)}</text>`).join('');
+  const arrows = stages.slice(0, -1).map((s) => `<path class="stage-link" d="M ${s.x + s.w + 2} 140 h 14" marker-end="url(#arr)"/>`).join('');
+  return `<svg class="chart" viewBox="0 0 960 260" role="img" aria-label="林小葡全程病程一张图：清宫、hCG 周序列、三个 MTX 疗程、hCG 达正常锚点与按月随访；阶段条自左向右，关键事件点均由本人勾选或档案自述">
+    <defs><marker id="arr" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#cfc2e2"/></marker></defs>
+    ${bar}${arrows}${dots}
+    <text class="tick" x="940" y="248" text-anchor="end">一张图口径：阶段与事件均来自本档案记录（事件由你勾选 / 档案自述）；不画参考区间带</text>
+  </svg>`;
+}
+
+function vOneshow() {
+  return `${pageHead('oneshow')}
+  <div class="card chart-card"><div class="card-head"><h2>全程病程一图秀</h2><span class="muted">清宫 → hCG 序列 → 疗程 → 锚点 → 随访</span></div>
+    <div class="chart-wrap">${oneshowChart()}</div>
+    <p class="legend"><span class="line-chip"><i class="diamond"></i>关键事件（由你勾选 / 档案自述）</span><span class="line-chip">阶段条按档案记录时段排列</span></p>
+  </div>
+  <div class="card"><div class="card-head"><h2>阶段清单（与图同源）</h2></div>
+    <div class="rows">
+      ${row('清宫', '2026-03-12 · 完全性葡萄胎 · 市一医院（档案自述）')}
+      ${row('hCG 周序列', '2026-03-16 → 06-22 · 16 点 · 事件标记 3 个（你勾选）')}
+      ${row('化疗', 'MTX 单药 × 3 疗 · 2026-04-20 → 06-19')}
+      ${row('hCG 达正常锚点', '2026-06-22 · 6 IU/L · 你勾选，随访以此为起点')}
+      ${row('随访', '第 1–3 个月已记录 · 计划 12 个月')}
+    </div>
+    ${quoteLine(QUOTE.s1)}
+  </div>
+  ${agentPane('请帮我把一图秀的五个阶段各写一句话，给不熟悉病情的家人看：只陈述日期与记录，不加判定、不用医学结论词。')}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+/* ---------------- 营养支持 ---------------- */
+function weightSpark() {
+  const w = D.nutrition.weight;
+  const x0 = 30, x1 = 420, y0 = 24, y1 = 96;
+  const vs = w.map(p => p.v);
+  const vmin = Math.min(...vs) - 0.5, vmax = Math.max(...vs) + 0.5;
+  const coords = w.map((p, i) => ({ x: x0 + (i / (w.length - 1)) * (x1 - x0), y: y1 - (p.v - vmin) / (vmax - vmin) * (y1 - y0) }));
+  return `<svg class="chart weight-spark" viewBox="0 0 450 130" role="img" aria-label="体重序列小图，共 ${w.length} 点，单位 kg">
+    <path class="line" d="${smoothPath(coords)}" pathLength="1"/>
+    ${w.map((p, i) => `<circle class="pt" cx="${coords[i].x.toFixed(1)}" cy="${coords[i].y.toFixed(1)}" r="4"><title>${p.d} · ${p.v} kg · 手工记录</title></circle>
+      <text class="tick" x="${coords[i].x.toFixed(1)}" y="${(y1 + 16).toFixed(1)}" text-anchor="middle">${p.d.slice(5)}</text>`).join('')}
+    <text class="tick" x="${x1}" y="14" text-anchor="end">体重（kg）· 仅陈述记录</text>
+  </svg>`;
+}
+
+function vNutrition() {
+  const n = D.nutrition;
+  const ulcerMeals = n.meals.filter(m => m.ulcer === '有');
+  return `${pageHead('nutrition')}
+  <div class="notice">${esc(n.note)}</div>
+  <div class="card"><div class="card-head"><h2>化疗期饮食记录（${n.meals.length} 条）</h2><div class="head-actions">${moreMenu([{ action: 'add-meal', label: '手工记一餐（≤6 字段）' }, { action: 'ai-meal-cand', label: 'AI：拍餐盘照片出候选' }])}</div></div>
+    <div class="rows">${n.meals.slice().reverse().map(m => row(
+      `${esc(m.d)} · ${esc(m.meal)}`,
+      `${esc(m.intake)} · 口腔情况：${m.ulcer === '有' ? '有溃疡——' + esc(m.ulcerNote || '按自述记录影响') : '无溃疡记录'} · 叶酸：${esc(m.folate)}`
+    )).join('')}</div>
+    ${quoteLine(n.quote)}
+  </div>
+  <div class="card"><div class="card-head"><h2>口腔溃疡期进食影响（${ulcerMeals.length} 条）</h2>${pill('按用户自述记录', 'grey')}</div>
+    <div class="rows">${ulcerMeals.map(m => row(`${esc(m.d)} · ${esc(m.meal)}`, esc(m.ulcerNote || '（自述有溃疡，未写细节）'))).join('')}</div>
+    <div class="notice">化疗期口腔溃疡较常见；这里只记录它对进食的影响（你的自述），不给处理方案，用什么漱口 / 药物请照医嘱。</div>
+  </div>
+  <div class="card"><div class="card-head"><h2>体重序列（${n.weight.length} 点）</h2><span class="muted">手工记录 · kg</span></div>
+    <div class="chart-wrap">${weightSpark()}</div>
+    <div class="rows">${row('最近一次', `${n.weight[n.weight.length - 1].d} · ${n.weight[n.weight.length - 1].v} kg`)}</div>
+  </div>
+  ${agentPane('请帮我把化疗期间的饮食记录按周整理成清单（日期 / 餐次 / 吃了什么 / 口腔情况），保持自述原文，不加营养建议、不判定轻重。')}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+/* ---------------- 心理支持 ---------------- */
+const MOOD_LABEL = { ok: '还好', flat: '平稳', down: '低落' };
+
+function vMind() {
+  const m = D.mind;
+  const privateBadge = pill('私密 · 仅本机', 'violet');
+  return `${pageHead('mind')}
+  <div class="notice">这一页的所有记录默认私密（is_private 心智）：仅本机保存，不进复诊材料、不进 AI 上下文摘要，除非你逐条主动选择。</div>
+  <div class="card"><div class="card-head"><h2>情绪日记（${m.moods.length} 条）</h2><div class="head-actions">${privateBadge}<div class="head-actions"><button data-action="add-mood">${esc(ENTRY_P9)}</button></div></div></div>
+    <div class="rows">${m.moods.slice().reverse().map(x => row(`${esc(x.d)} · ${MOOD_LABEL[x.state] || ''}`, esc(x.text), pill(MOOD_LABEL[x.state] || '', 'grey'))).join('')}</div>
+    ${quoteLine(m.quote)}
+  </div>
+  <div class="card"><div class="card-head"><h2>等待 hCG 报告日（${m.waitDays.length} 条）</h2>${pill('GTN 特异场景', 'grey')}</div>
+    <div class="rows">${m.waitDays.slice().reverse().map(x => row(`${esc(x.d)} · 等报告日`, `${esc(x.text)} · 当时这么撑过去：${esc(x.cope)}`)).join('')}</div>
+    <div class="actions"><button class="soft" data-action="add-wait">记一个等报告日</button></div>
+  </div>
+  <div class="card"><div class="card-head"><h2>家庭 / 伴侣沟通记录（${m.family.length} 条）</h2>${privateBadge}</div>
+    <div class="rows">${m.family.slice().reverse().map(x => row(`${esc(x.d)} · 与${esc(x.who)}`, esc(x.text))).join('')}</div>
+    <div class="notice">沟通记录只留你这一侧的叙述，不替对方写结论；再生育相关话题以你的医嘱为准，工具不做安排。</div>
+  </div>
+  <div class="card"><div class="card-head"><h2>心理资源清单</h2></div>
+    ${m.resources.length ? '' : emptyBox('还没有可列的心理资源', '如实说明：本演示未接入、也未核实任何心理咨询 / 病友组织资源；「未核实」的资源一律不展示。')}
+  </div>
+  ${agentPane('请帮我把等报告日的记录整理成一段给医生看的描述（只写日期和我的状态，不加判断）；注意：情绪与家庭记录是私密内容，不要放进摘要。')}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+/* ---------------- 临床研究（登记摘录） ---------------- */
+function vTrials() {
+  const t = D.trials;
+  const filters = [
+    ['all', `全部来源（${t.items.length}）`],
+    ['chinadrugtrials', '中国药物临床试验登记平台'],
+    ['other', '其它来源（演示空态）']
+  ];
+  const list = state.trialFilter === 'all' ? t.items
+    : state.trialFilter === 'chinadrugtrials' ? t.items.filter(i => i.source.includes('登记平台'))
+    : [];
+  return `${pageHead('trials')}
+  <div class="notice">${esc(t.disclaimer)}</div>
+  <div class="card"><div class="card-head"><h2>登记研究（${t.items.length} 条摘录）</h2><span class="muted">快照 2026-10-25 · ${esc(t.sourceLabel)}</span></div>
+    <div class="chip-row" role="group" aria-label="按来源筛选">${filters.map(([k, l]) =>
+      `<button class="chip${state.trialFilter === k ? ' on' : ''}" data-action="trial-filter" data-arg="${k}" aria-pressed="${state.trialFilter === k}">${l}</button>`).join('')}</div>
+    ${list.length ? list.map(i => `<div class="cand">
+      <div class="cand-head"><b>${esc(i.title)}</b>${pill(i.status, 'yellow')}</div>
+      <div class="cand-fields">
+        <span><i>登记号</i><b>${esc(i.recordId)}</b></span>
+        <span><i>申办方</i><b>${esc(i.sponsor)}</b></span>
+        <span><i>来源</i><b>${esc(i.source)}</b></span>
+      </div>
+      <p class="muted small">登记 ≠ 有效 ≠ 可入组；详情与参与条件请以登记平台原文及研究方答复为准：${esc(i.url)}</p>
+    </div>`).join('') : emptyBox('没有匹配的登记条目', '换一个来源筛选试试；「其它来源」在当前快照里为空，如实显示空态。')}
+  </div>
+  ${agentPane('请帮我把这 6 条登记摘录整理成一张表（登记号 / 题目 / 状态），我在门诊时逐条问医生哪些值得进一步核实；不要替我判断哪条适合我。')}
+  ${quoteLine(QUOTE.none)}`;
+}
+
+const VIEWS = { dashboard: vDashboard, hcg: vHcg, treatment: vTreatment, diagnosis: vDiagnosis, followup: vFollowup, oneshow: vOneshow, nutrition: vNutrition, mind: vMind, trials: vTrials, import: vImport, review: vReview, settings: vSettings };
 
 /* ---------------- 渲染 ---------------- */
 function render() {
@@ -510,6 +734,27 @@ function formEditFigo() {
     <div class="notice">照抄报告原始分，不 AI 估算、不输出分级建议。</div>`,
     `<button data-action="save-figo">保存（总分自动求和：${figoTotal()}）</button><button class="soft" data-action="close">取消</button>`);
 }
+function formAddMood(kind) {
+  const isWait = kind === 'wait';
+  openDialog(isWait ? '记一个等报告日（3 字段）' : '写一条情绪记录（3 字段）',
+    `<div class="form">
+      <label>日期<input name="d" value="2026-10-25"></label>
+      ${isWait ? '' : `<label>情绪三态（单选）
+        <div class="score-row">${Object.entries(MOOD_LABEL).map(([k, l]) =>
+          `<button type="button" class="chip on-mood" data-action="mood-pick" data-k="${k}" aria-pressed="false">${l}</button>`).join('')}</div>
+        <input type="hidden" name="state" value="flat"></label>`}
+      <label>${isWait ? '那天是什么样<input name="text" placeholder="如：反复看手机，饭也没心思做"></label>' : '想写一句什么<input name="text" placeholder="一句就行，可以只写几个字"></label>'}
+      ${isWait ? `<label>当时怎么撑过去的<input name="cope" placeholder="如：提前约了妈妈陪"></label>` : ''}
+    </div>
+    <div class="notice">私密记录（is_private）：仅本机保存，不进复诊材料与 AI 上下文。</div>`,
+    `<button data-action="save-${kind}">保存</button><button class="soft" data-action="close">取消</button>`);
+  document.querySelectorAll('.on-mood').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.on-mood').forEach(x => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+    b.classList.add('on'); b.setAttribute('aria-pressed', 'true');
+    $('#dialog-body [name="state"]').value = b.dataset.k;
+  }));
+}
+
 function formVersions(vList, title) {
   openDialog(title || '版本链（更正历史，旧值不丢）',
     `<div class="rows">${vList.map(v => row(`v：${esc(v.v)}`, `${esc(v.at)} · ${esc(v.src)}`)).join('')}</div>`,
@@ -641,6 +886,49 @@ const actions = {
   'parse-mode'(el) { state.parseMode = el.value; toast(`解析模式：${el.value === 'cloud' ? '云端解析（逐文件授权）' : '本机解析（不上传原件）'}（需点「保存」生效）。`); },
   'save-settings'() { toast('设置已保存。点顶栏「小葡宝工作台」回到看板。'); },
   'cancel-settings'() { state.storeDir = D.settings.dir; state.parseMode = D.settings.parseMode; render(); toast('已取消：本次改动丢弃，无副作用。'); },
+  /* 指标分类 3D 卡翻转（点击 / 回车 / 空格均走按钮 click） */
+  flip(el) {
+    const key = el.dataset.key;
+    if (state.flipped.has(key)) state.flipped.delete(key);
+    else state.flipped.add(key);
+    el.setAttribute('aria-pressed', state.flipped.has(key) ? 'true' : 'false');
+  },
+  /* 营养 */
+  'add-meal'() {
+    openDialog('手工记一餐（≤6 字段）',
+      `<div class="form">
+        <label>日期<input name="d" value="2026-10-25"></label>
+        <label>餐次<input name="meal" value="午餐" placeholder="早餐 / 午餐 / 晚餐 / 加餐"></label>
+        <label>吃了什么<input name="intake" placeholder="如：软面条 1 碗 + 蒸蛋"></label>
+        <label>口腔情况<input name="ulcer" value="无溃疡记录" placeholder="如：有溃疡，烫的吃不了"></label>
+        <label>叶酸（照医嘱原文）<input name="folate" placeholder="只照医嘱记录，不写建议"></label>
+      </div>
+      <div class="notice">口腔情况按你的自述记录影响；叶酸补充与否、剂量与时机只照医嘱原文。</div>`,
+      `<button data-action="save-meal">保存</button><button class="soft" data-action="close">取消</button>`);
+  },
+  'save-meal'() {
+    const g = (n) => $(`#dialog-body [name="${n}"]`).value.trim();
+    const ulcer = g('ulcer');
+    D.nutrition.meals.push({ d: g('d') || '2026-10-25', meal: g('meal') || '加餐', intake: g('intake'), ulcer: ulcer.includes('溃疡') && !ulcer.includes('无') ? '有' : '无', ulcerNote: ulcer, folate: g('folate') || '未填' });
+    closeDialog(); render(); toast('饮食记录 +1（手工通道）；AI 候选默认收在「⋯ 更多」里。');
+  },
+  'ai-meal-cand'() { toast('AI 拍餐盘出候选（演示）：候选卡出现在核对区，逐项核对后才入档。'); },
+  /* 心理 */
+  'add-mood'() { formAddMood('mood'); },
+  'add-wait'() { formAddMood('wait'); },
+  'mood-pick'() { /* 三态选择在 formAddMood 内联绑定处理 */ },
+  'save-mood'() {
+    const g = (n) => $(`#dialog-body [name="${n}"]`).value.trim();
+    D.mind.moods.push({ d: g('d') || '2026-10-25', state: g('state') || 'flat', text: g('text') });
+    closeDialog(); render(); toast('情绪记录 +1 · 私密仅本机，不进任何导出。');
+  },
+  'save-wait'() {
+    const g = (n) => $(`#dialog-body [name="${n}"]`).value.trim();
+    D.mind.waitDays.push({ d: g('d') || '2026-10-25', text: g('text'), cope: g('cope') || '（未写）' });
+    closeDialog(); render(); toast('等报告日记录 +1 · 私密仅本机。');
+  },
+  /* 临床研究 */
+  'trial-filter'(el) { state.trialFilter = el.dataset.arg; render(); },
   /* 键盘 */
   key(el) { keypadKey(el.dataset.k); },
   'key-ok'() { if (state.keypad && state.keypad.input) state.keypad.input.value = $('#keypad-screen').value; closeDialog(); },

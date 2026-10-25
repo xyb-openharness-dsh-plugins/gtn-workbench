@@ -1,0 +1,178 @@
+/* 演示数据播种（GTN / 林小葡旅程）。
+ *
+ * **唯一数据源是 public/demo-data.js**（原型四件套之一，check-prototype 也断言它）。
+ * 这里在 Node 里读取该文件并求值取出 window.DEMO_DATA，再把同一份数值写进
+ * 用户资料目录的库——不在别处再抄一份数字，否则原型与开发版会各说一套
+ * （test/store.test.mjs 的 deepStrictEqual parity 断言就是钉这个的）。
+ *
+ * 幂等：库里已经有 subjects 就整批跳过（开发版启动时可能跑很多次）。
+ * 事务：整批在一个事务里，中途失败整体回滚，不留"半个档案"。
+ *
+ * 映射口径（schema 0001 + 0002）：
+ * - hCG 点：hcg_rows（in_use=1 为现行值；带版本链的点拆成 base(in_use=0) + 更正行(revision_of)，
+ *   ver_at/ver_src 记"何时改/为什么改"，与 demo-data.js 的 versions 数组一一对应）；
+ * - 疗程卡：chemo_cycles（fields 键值区 → fields_json 原文；更正链同 hCG）；
+ * - FIGO 8 项：figo_rows 一行（照抄原始分，**总分由读模型求和，不落库**）；
+ * - 末次妊娠：pregnancy_rows（0002 展示列 lmp/hospital/gest_week/uterus_size/bleeding）；
+ * - 病理/影像摘录：pathology_rows（0002，原文照抄不判读）；
+ * - 随访月：followup_rows（hcg_text 存原文串；锚点= hCG 序列里 event_mark='anchor' 那行）；
+ * - 出处切换：guideline_sources（nccn / csm / mine）；
+ * - 问题清单：question_rows；资料/候选：documents / candidates（id 由库自增，
+ *   读模型还原成 'D1'/'C1' 形状）；
+ * - planMonths / anchorLabel / meta：demo_meta。
+ */
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const DEMO_DATA_PATH = fileURLToPath(new URL('../public/demo-data.js', import.meta.url));
+
+/** 读取并求值 public/demo-data.js（浏览器脚本：`window.DEMO_DATA = {...}`）。 */
+export function loadDemoData(path = DEMO_DATA_PATH) {
+  const src = readFileSync(path, 'utf8');
+  const win = {};
+  new Function('window', `'use strict'\n${src}\n`)(win);
+  if (!win.DEMO_DATA || typeof win.DEMO_DATA !== 'object') {
+    throw new Error(`public/demo-data.js 没有产出 window.DEMO_DATA：${path}`);
+  }
+  return win.DEMO_DATA;
+}
+
+const j = (v) => (v === undefined ? null : JSON.stringify(v));
+
+/** 把 demo-data（林小葡）写进库。返回写入计数。 */
+export function seedDemo(db, input) {
+  if (!db || typeof db.prepare !== 'function') throw new TypeError('seedDemo 需要一个已打开的数据库');
+  const D = input || loadDemoData();
+
+  const already = db.prepare('SELECT COUNT(*) AS n FROM subjects').get().n;
+  if (already > 0) return { skipped: true, subjects: 0, hcg: 0, cycles: 0, followup: 0 };
+
+  const counts = { skipped: false, subjects: 0, hcg: 0, cycles: 0, followup: 0 };
+  const key = 'lin';
+
+  db.exec('BEGIN');
+  try {
+    db.prepare(`INSERT INTO subjects
+      (profile_key, name, age, meta, headline, stage_text, mindset, dash_keys, path)
+      VALUES (?,?,?,?,?,?,?,?,?)`)
+      .run(key, D.patient.name, D.patient.age, null, D.patient.headline, null, null, j([]), j([]));
+    counts.subjects++;
+
+    /* hCG 序列：普通点一行；带 versions 的点拆 base + 更正行（更正行 in_use=1 承接事件与现行值）。 */
+    const insHcg = db.prepare(`INSERT INTO hcg_rows
+      (profile_key, drawn_on, value, unit, hospital, event_mark, note, in_use, revision_of, ver_at, ver_src)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+    for (const p of D.hcg.points) {
+      if (!p.versions) {
+        insHcg.run(key, p.d, p.v, D.hcg.unit, p.src, p.event ?? null, null, 1, null, null, null);
+        counts.hcg++;
+        continue;
+      }
+      /* 版本链：versions[i] 对应第 i 版。最后一版是现行值（in_use=1）；旧版 in_use=0。 */
+      let prevId = null;
+      for (const ver of p.versions) {
+        const isCurrent = ver === p.versions[p.versions.length - 1];
+        const r = insHcg.run(key, p.d, Number(ver.v), D.hcg.unit, p.src,
+          isCurrent ? (p.event ?? null) : null, null,
+          isCurrent ? 1 : 0, prevId, ver.at ?? null, ver.src ?? null);
+        prevId = Number(r.lastInsertRowid);
+        counts.hcg++;
+      }
+    }
+
+    /* 疗程卡：fields 存 JSON 原文；带 versions 的拆 base + 更正行（旧版结束日期）。 */
+    const insCycle = db.prepare(`INSERT INTO chemo_cycles
+      (profile_key, cycle_no, regimen, start_on, end_on, hcg_on_day, note, in_use, revision_of,
+       fields_json, ver_field, ver_at, ver_src)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    for (const c of D.cycles) {
+      const base = c.versions ? c.versions[0] : null;   // 初次录入值（结束日期）
+      if (!base) {
+        insCycle.run(key, c.n, c.regimen, c.start, c.end, c.hcgOnDay, c.note, 1, null,
+          j(c.fields), null, null, null);
+        counts.cycles++;
+        continue;
+      }
+      const fix = c.versions[c.versions.length - 1];
+      const r1 = insCycle.run(key, c.n, c.regimen, c.start, base.v, c.hcgOnDay, c.note, 0, null,
+        j(c.fields), base.field ?? null, base.at ?? null, base.src ?? null);
+      insCycle.run(key, c.n, c.regimen, c.start, fix.v, c.hcgOnDay, c.note, 1, Number(r1.lastInsertRowid),
+        j(c.fields), fix.field ?? null, fix.at ?? null, fix.src ?? null);
+      counts.cycles += 2;
+    }
+
+    /* 末次妊娠档案 */
+    const pg = D.pregnancy;
+    db.prepare(`INSERT INTO pregnancy_rows
+      (profile_key, preg_type, preg_end_on, dnc_count, pathology_text, in_use, revision_of,
+       lmp, hospital, gest_week, uterus_size, bleeding)
+      VALUES (?,?,?,?,?,1,null,?,?,?,?,?)`)
+      .run(key, pg.type, pg.evacuationDate, null, null,
+        pg.lmp ?? null, pg.hospital ?? null, pg.gestWeek ?? null, pg.uterusSize ?? null, pg.bleeding ?? null);
+
+    /* FIGO 8 项：一行照抄原始分；note 列存 figoNote（出处说明）。 */
+    const f = D.figo;
+    db.prepare(`INSERT INTO figo_rows
+      (profile_key, s_age, s_preg_type, s_interval, s_hcg, s_tumor, s_met_site, s_met_count, s_prev_fail,
+       source_note, in_use, revision_of)
+      VALUES (?,?,?,?,?,?,?,?,?,?,1,null)`)
+      .run(key, f[0].picked, f[1].picked, f[2].picked, f[3].picked, f[4].picked,
+        f[5].picked, f[6].picked, f[7].picked, D.figoNote ?? null);
+
+    /* 病理/影像原文摘录 */
+    const insPatho = db.prepare(`INSERT INTO pathology_rows (profile_key, src, text, ord, in_use, revision_of)
+      VALUES (?,?,?,?,1,null)`);
+    D.pathology.forEach((x, i) => insPatho.run(key, x.src, x.text, i));
+
+    /* 随访月记录 */
+    const insFollow = db.prepare(`INSERT INTO followup_rows
+      (profile_key, month_no, drawn_on, hcg_value, contraception, fertility_plan, source, note,
+       in_use, revision_of, hcg_text)
+      VALUES (?,?,?,?,?,?,?,NULL,1,null,?)`);
+    for (const m of D.followup.months) {
+      const num = Number(m.hcg);
+      insFollow.run(key, m.n, m.due, Number.isFinite(num) ? num : null, m.contra, m.fertility, null, m.hcg);
+      counts.followup++;
+    }
+
+    /* 出处切换注册表 */
+    const insSource = db.prepare('INSERT INTO guideline_sources (key, label, version, url, note) VALUES (?,?,?,?,?)');
+    for (const [k, s] of Object.entries(D.sources)) insSource.run(k, s.label, null, null, s.text);
+
+    /* 复诊问题清单 */
+    const insQ = db.prepare('INSERT INTO question_rows (profile_key, text, asked, in_use, revision_of) VALUES (?,?,0,1,null)');
+    for (const q of D.questions) insQ.run(key, q);
+
+    /* 资料档案（documents.id 由库自增，读模型还原成 'D1' 形状） */
+    const insDoc = db.prepare('INSERT INTO documents (profile_key, kind, filename, imported_at, sha256, status) VALUES (?,?,?,?,?,?)');
+    for (const d of D.imports.docs) insDoc.run(key, d.type, d.name, d.date, null, d.status);
+
+    /* 候选（未核对不入事实层） */
+    const insCand = db.prepare('INSERT INTO candidates (profile_key, doc_id, field_key, value_text, status, reviewed_at, filename, fields_json) VALUES (?,?,?,?,?,?,?,?)');
+    for (const c of D.imports.candidates) {
+      insCand.run(key, null, 'hcg_import', null, c.status ?? 'pending', null, c.file, j(c.fields));
+    }
+
+    /* demo_meta：meta 三件 + 随访计划参数 */
+    const insMeta = db.prepare('INSERT OR REPLACE INTO demo_meta (key, text) VALUES (?,?)');
+    for (const [k, v] of Object.entries(D.meta || {})) insMeta.run(k, String(v));
+    insMeta.run('followup_plan_months', String(D.followup.planMonths));
+    insMeta.run('followup_anchor_label', D.followup.anchorLabel);
+
+    db.exec('COMMIT');
+  } catch (error) {
+    try { db.exec('ROLLBACK'); } catch { /* 回滚失败也要把原始错误抛出去 */ }
+    throw new Error(`播种演示数据失败（已回滚）：${error.message}`);
+  }
+  return counts;
+}
+
+/** 库的演示档案是否已播种过。启动流程用它决定要不要 seedDemo。 */
+export function hasDemoData(db) {
+  try {
+    return db.prepare('SELECT COUNT(*) AS n FROM subjects').get().n > 0;
+  } catch {
+    return false;
+  }
+}
