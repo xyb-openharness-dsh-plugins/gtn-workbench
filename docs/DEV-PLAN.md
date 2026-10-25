@@ -5,7 +5,7 @@
 | 里程碑 | 内容 | 状态 |
 |---|---|---|
 | M0 | 领取 #38 + init + 9 文档骨架 + 接线前置（cordis root）+ staticPass | ✅ |
-| M1 | 三路调研（医学核数/用户研究/家族对比）→ DIFF-MATRIX 实测 + SPEC/USER-RESEARCH/INTERACTION-DESIGN 全量 | ⏳ |
+| M1 | 三路调研（医学核数/用户研究/家族对比）→ DIFF-MATRIX 实测 + SPEC/USER-RESEARCH/INTERACTION-DESIGN 全量 | ✅ 2026-10-25（G1 闸口用户未应答，按可回退推荐项继续，**签认待补**） |
 | M2 | HTML 原型（demo 唯一源、32 折叠卡、30 窄宽、HVT X1–X4、agent-draft、独立评审 P0=0、README ≥4 实渲截图） | ⏳ |
 | M3 | schema/0001 + freeze-contract sha256 + 判读列断言 | ⏳ |
 | M4 | fetch-gtn-trials 四件套 | ⏳ |
