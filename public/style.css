@@ -318,3 +318,12 @@ svg.chart.metric-chart { min-width: 640px; }
 .metric-spark .line { fill: none; stroke: var(--brand-deep); stroke-width: 2; }
 .metric-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .metric-row-side .chip-row { margin-bottom: 0; justify-content: flex-end; }
+
+/* 疾病概要 ? 入口（用户 2026-10-25 指令）：看板标题行右侧圆钮 + 弹窗四要素 */
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.brief-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line, #d8d3cf); background: transparent; color: var(--ink-2, #6f6a66); font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; flex: none; }
+.brief-btn:hover, .brief-btn:focus-visible { border-color: var(--accent, #8a5a44); color: var(--accent, #8a5a44); }
+.brief-sec h3 { font-size: 13px; margin: 10px 0 4px; }
+.brief-sec p { font-size: 12.5px; margin: 0 0 6px; }
+.brief-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.brief-table th, .brief-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line, #eee); }

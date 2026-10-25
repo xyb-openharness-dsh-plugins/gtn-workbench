@@ -4,6 +4,22 @@
 
 需求见 [BRIEF](docs/BRIEF.md)，规格见 [SPEC](docs/SPEC.md)，场景见 [SCENARIOS](docs/SCENARIOS.md)，交互合同见 [INTERACTION-DESIGN](docs/INTERACTION-DESIGN.md)，临床口径见 [CLINICAL-DATA](docs/CLINICAL-DATA.md)（NCCN GTN 2.2026 / FIGO 2000 / 中华医学会 2021）；先读 [AGENTS](AGENTS.md)。
 
+<details>
+<summary><b>? 疾病概要</b>（定义 · 规范与指南 · 治疗全景 · 发展趋势；看板右上 ? 图标点击可见同款弹窗）</summary>
+
+![疾病概要弹窗](docs/screenshots/readme-disease-brief-0.6.0.png)
+
+**定义**：妊娠滋养细胞肿瘤（GTN）是一组源自妊娠滋养细胞的疾病，主要包括侵蚀性葡萄胎、绒毛膜癌与胎盘部位滋养细胞肿瘤等，多继发于葡萄胎妊娠，好发于育龄女性；血 hCG 是贯穿诊断、疗效与随访的核心监测指标。
+
+**医学资料规范和指南情况**：NCCN Gestational Trophoblastic Neoplasia **2.2026**（当前版，3.2025 已被取代）；FIGO/WHO 2000 解剖学分期（Ⅰ–Ⅳ）与预后评分（8 项各 0/1/2/4 分）；中华医学会《妊娠滋养细胞疾病诊断与治疗指南（2021 年版·第四版）》；随访与避孕口径 NCCN/中国/EOTTD 不一致（工作台内出处切换）；hCG 检测溯源 YY/T 1192-2011（"WS/T 679"未核实）；NMPA 药品查询官方入口。
+
+**目前治疗全景概要**：以化疗为主要治疗（单药/联合取舍由 FIGO 评分与主管医生决定，工作台不载剂量）；hCG 序列是疗效与随访的核心线索；hCG 达正常锚点（用户勾选口径）后进入按月随访期，含避孕与再生育规划。具体方案与判断以你的主诊医生为准。
+
+**发展趋势**：指南持续迭代（NCCN 3.2025→2.2026）；免疫治疗等新方向仅见于研究文献线索，本工作台不载疗效信息（未核实）；随访节奏多源并存、尚未统一。
+
+以上为公开资料的整理性概要，不构成诊断或治疗建议；版本与出处详见 [CLINICAL-DATA](docs/CLINICAL-DATA.md)。
+</details>
+
 ## 关键功能（v0.2.0 原型实渲截图，演示数据、患者人名虚构）
 
 ### 看板（含 3D 指标分类卡）
@@ -75,4 +91,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.5.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.6.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

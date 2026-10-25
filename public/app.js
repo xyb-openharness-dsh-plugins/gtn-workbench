@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.5.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
+/* 小葡宝 GraPal v0.6.0 — GTN 工作台开发版（检查与指标二级页签 + 多系列指标趋势 + 指标管理）。
    视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.5.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.6.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -158,7 +158,37 @@ const moreMenu = (items) => `<details class="more"><summary aria-label="更多�
 
 function pageHead(view) {
   const p = PAGES.find(x => x[0] === view);
-  return `<div class="page-head"><div><h1>${esc(p[1])}</h1><p>${esc(SUBTITLES[view])}</p></div></div>`;
+  /* 疾病概要 ? 入口（用户 2026-10-25 指令）：看板标题行右侧，四要素精炼概要 */
+  const briefBtn = view === 'dashboard'
+    ? `<button class="brief-btn" data-action="disease-brief" aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势" title="疾病概要">?</button>` : '';
+  return `<div class="page-head"><div><h1>${esc(p[1])}</h1><p>${esc(SUBTITLES[view])}</p></div>${briefBtn}</div>`;
+}
+
+/* 疾病概要（来源 docs/CLINICAL-DATA.md，只做整理性概要，不构成诊断或治疗建议）。 */
+const DISEASE_BRIEF = {
+  def: '妊娠滋养细胞肿瘤（GTN）是一组源自妊娠滋养细胞的疾病，主要包括侵蚀性葡萄胎、绒毛膜癌与胎盘部位滋养细胞肿瘤等，多继发于葡萄胎妊娠，好发于育龄女性；血 hCG 是贯穿诊断、疗效与随访的核心监测指标。',
+  guides: [
+    ['NCCN Gestational Trophoblastic Neoplasia', '2.2026（当前版；3.2025 已被取代）'],
+    ['FIGO/WHO 2000 解剖学分期与预后评分', 'Ⅰ–Ⅳ 期；8 项评分各 0/1/2/4 分'],
+    ['中华医学会《妊娠滋养细胞疾病诊断与治疗指南》', '2021 年版（第四版）'],
+    ['随访与避孕口径', 'NCCN / 中国 / EOTTD 不一致——工作台内做出处切换 + 我的医嘱自录'],
+    ['hCG 检测溯源', '行业标准 YY/T 1192-2011；"WS/T 679"未核实'],
+    ['药品信息', 'NMPA 药品查询官方入口（甲氨蝶呤等具体品种逐条核实）'],
+  ],
+  treat: '以化疗为主要治疗（单药与联合方案的取舍由 FIGO 评分与主管医生决定，工作台不载剂量）；hCG 序列是疗效与随访的核心线索；hCG 达正常锚点（用户勾选口径）后进入按月随访期，含避孕方式与再生育规划。具体方案与判断以你的主诊医生为准。',
+  trend: '指南持续迭代（本病种 NCCN 已从 3.2025 更新至 2.2026）；免疫治疗等新方向仅见于研究文献线索，本工作台不载疗效信息（未核实）；随访节奏多源并存、尚未统一。',
+};
+function diseaseBriefDialog() {
+  openDialog('GTN 疾病概要', `
+    <div class="brief-sec"><h3>定义</h3><p>${esc(DISEASE_BRIEF.def)}</p></div>
+    <div class="brief-sec"><h3>医学资料规范和指南情况</h3>
+      <table class="brief-table"><thead><tr><th>来源</th><th>版本 / 口径</th></tr></thead><tbody>
+      ${DISEASE_BRIEF.guides.map(g => `<tr><td>${esc(g[0])}</td><td>${esc(g[1])}</td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="brief-sec"><h3>目前治疗全景概要</h3><p>${esc(DISEASE_BRIEF.treat)}</p></div>
+    <div class="brief-sec"><h3>发展趋势</h3><p>${esc(DISEASE_BRIEF.trend)}</p></div>
+    <p class="muted">以上为公开资料的整理性概要，不构成诊断或治疗建议；版本与出处详见设置页与 docs/CLINICAL-DATA.md。</p>`,
+    '<button data-action="close">关闭</button>');
 }
 
 /* AI 协助条：每个一级页至少一处 gtn:agent-draft 按钮。 */
@@ -1282,7 +1312,8 @@ const actions = {
   /* 键盘 */
   key(el) { keypadKey(el.dataset.k); },
   'key-ok'() { if (state.keypad && state.keypad.input) state.keypad.input.value = $('#keypad-screen').value; closeDialog(); },
-  close() { closeDialog(); }
+  close() { closeDialog(); },
+  'disease-brief'() { diseaseBriefDialog(); }
 };
 
 document.addEventListener('click', (e) => {

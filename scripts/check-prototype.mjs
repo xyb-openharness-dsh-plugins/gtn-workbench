@@ -123,6 +123,12 @@ check('more-menu-manual-entry', /⋯ 更多/.test(app), {});
 check('decimal-keypad', /inputmode="decimal"/.test(app) && /data-keypad/.test(app) && /keypad/.test(css), {});
 /* ---------- demo 数据完整性（林小葡旅程） ---------- */
 const pts = (data.match(/d: '\d{4}-\d{2}-\d{2}', v:/g) || []).length;
+check('disease-brief-entry', app.includes('data-action="disease-brief"') && /aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势"/.test(app), {});
+const readmeMd = read('README.md');
+check('disease-brief-four-sections',
+  ['定义', '医学资料规范和指南情况', '目前治疗全景概要', '发展趋势'].every(t => app.includes(t))
+  && ['定义', '规范与指南', '治疗全景', '发展趋势'].every(t => readmeMd.includes(t))
+  && readmeMd.includes('? 疾病概要'), {});
 check('demo-journey', data.includes('林小葡') && pts >= 13 && /plateau/.test(data) && /anchor/.test(data) && /rise/.test(data), { hcgPoints: pts });
 /* ---------- v0.2.0 新增：3D 指标分类卡 ---------- */
 check('flip-3d-card-css', /transform-style:\s*preserve-3d/.test(css) && /rotateY\(180deg\)/.test(css) && /backface-visibility:\s*hidden/.test(css), {});
