@@ -105,4 +105,4 @@ node scripts/fetch-gtn-trials-2026.mjs --dry-run  # 试验采集预演
 npm run check                      # 装包合同静态检查
 ```
 
-版本 v0.8.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。
+版本 v0.9.0 · 2026-10-25 · 小 X 宝家族。当前为原型阶段（M2），生产功能按 [DEV-PLAN](docs/DEV-PLAN.md) 推进。

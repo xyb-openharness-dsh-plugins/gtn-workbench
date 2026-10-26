@@ -47,7 +47,7 @@ test('② /api/gtn/bootstrap 返回与 demo-data.js 同形的档案', async () =
     const j = await r.json();
     assert.ok(j.data, 'bootstrap 必须带 data（单档案形状）');
     assert.equal(j.data.patient.name, '林小葡');
-    assert.equal(j.data.hcg.points.length, 15);
+    assert.equal(j.data.hcg.points.length, 16);
     assert.equal(j.data.cycles.length, 3);
     assert.equal(j.data.trials.items.length, 6, '登记摘录 6 条');
     assert.equal(j.data.metricCats.length, 4, '指标分类卡 4 张');
@@ -113,7 +113,7 @@ test('⑥ 候选核对：accept/reject 只改状态；拒收零副作用', async
     assert.equal(afterReject.status, 'rejected');
     assert.ok(afterReject.filename && afterReject.fields_json, '拒收不改候选原文（零副作用）');
     /* 事实层不受影响 */
-    assert.equal(workbench.db.prepare('SELECT COUNT(*) AS n FROM hcg_rows').get().n, 16, '拒收不写 hCG 行');
+    assert.equal(workbench.db.prepare('SELECT COUNT(*) AS n FROM hcg_rows').get().n, 17, '拒收不写 hCG 行');
 
     const acc = await fetch(`${url}api/gtn/candidate/${id}/accept`, { method: 'POST' });
     assert.equal(acc.status, 200);

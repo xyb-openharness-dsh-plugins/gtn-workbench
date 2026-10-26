@@ -47,7 +47,7 @@ test('② seedDemo 幂等：调两次只写一份档案', () => {
   assert.equal(a.subjects, 1);
   assert.equal(b.skipped, true, '第二次应整批跳过');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM subjects').get().n, 1);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM hcg_rows').get().n, 16, '15 个点 + 1 条版本链旧行');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM hcg_rows').get().n, 17, '16 个点 + 1 条版本链旧行');
   close(db);
 });
 
@@ -80,7 +80,7 @@ test('④ 派生值不落库：FIGO 总分读取时求和，表内无总分列',
 test('⑤ hCG 版本链：in_use 行是现行值，旧行带 ver_at/ver_src 且可还原 versions', () => {
   const db = seededDb();
   const p = getProfile(db, 'lin');
-  assert.equal(p.hcg.points.length, 15, '15 个数据点');
+  assert.equal(p.hcg.points.length, 16, '16 个数据点（含 2026-10-20 随访月点）');
   const corrected = p.hcg.points.find((x) => x.versions);
   assert.ok(corrected, '2026-04-27 的点有版本链');
   assert.equal(corrected.d, '2026-04-27');

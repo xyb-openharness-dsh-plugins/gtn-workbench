@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.8.0 — GTN 工作台开发版（一图秀 rail 多指标趋势 + 分类卡原位翻转 + 临床研究分层命中 v2）。
+/* 小葡宝 GraPal v0.9.0 — GTN 工作台开发版（一图秀 rail 多指标趋势 + 分类卡原位翻转 + 临床研究分层命中 v2）。
    视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.8.0', build: '2026-10-25' };
+const APP_INFO = { version: '0.9.0', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
@@ -146,7 +146,7 @@ const state = {
   savedTrials: new Set(),    // 收藏的登记条目（saved_trial 心智：只留线索，record_id 集合，仅本机态）
   /* 一图秀（breast rail 口径）：时间范围 + 指标勾选（≤4）+ 显示开关 + 点选 pin */
   oneshow: {
-    range: 'all',            // '3m' | '6m' | '12m' | 'all'
+    range: '6m',             // 默认近 6 月到当前（用户口径）；'3m' | '6m' | '12m' | 'all'
     sel: ['hcg', 'wbc'],     // 序列 key；上限 4，超限 toast（breast rail 口径）
     toggles: { treatment: true, keypoints: true, changes: true },
     pin: null                // 'key|date' 字符串（点选记录点）
@@ -302,8 +302,8 @@ function metricCatCard(c) {
   return `<button class="mcard" data-action="flip" data-key="${c.key}" aria-pressed="${flipped}" aria-label="指标分类：${esc(c.name)}，${rep && last ? `当前 ${last.v} ${rep.unit}，` : ''}已记录 ${pts.length || c.count} 次；点按或回车翻到背面看趋势与说明">
     <span class="mcard-inner">
       <span class="mface front" aria-hidden="true">
-        <span class="cat"><i style="background:${color}"></i>指标分类</span>
-        <span class="name">${esc(c.name)}</span>
+        <span class="cat"><i style="background:${color}"></i>${esc(c.name)}</span>
+        <span class="name">${rep ? esc(rep.name) : '报告摘录（无数值序列）'}</span>
         ${rep && last ? `<span class="val">${last.v}<small> ${esc(rep.unit)}</small></span><span class="delta">${delta}</span>` : `<span class="val">${esc(c.latest)}</span><span class="delta">无数值序列</span>`}
         <span class="rec">已记录 ${pts.length || c.count} 次${rep && last ? ` · ${esc(last.d)}` : ''}</span>
         <span class="meta"><span>点按 / 回车翻转</span><span class="hint">↻</span></span>
@@ -1089,6 +1089,17 @@ function matchPrompt() {
 }
 
 /* 单条试验的分层结果卡（35 号三态：命中分层陈列 + 无法自动匹配列原因；宽口径排末尾）。 */
+/* 粗筛符合度（biliary 口径）：符合项 ÷ 已对照项；无法自动匹配按 0 计——只会偏低、不会偏高；不是入组资格。 */
+function matchBand(e) {
+  const met = e.rules.filter((r) => r.tier === 'satisfied').length;
+  const unmet = e.rules.filter((r) => r.tier === 'conflict').length;
+  const unknown = e.rules.filter((r) => r.tier === 'undetermined').length;
+  const pct = Math.round((met / Math.max(1, met + unmet + unknown)) * 100);
+  const band = (pct >= 80 && unknown <= 1) ? ['high', '高度符合'] : pct >= 55 ? ['partial', '部分符合'] : ['needs_info', '需补充信息'];
+  return { met, unmet, unknown, pct, band };
+}
+const BAND_ORDER = { high: 0, partial: 1, needs_info: 2 };
+
 function matchResultCard(e) {
   const item = D.trials.items.find((t) => t.recordId === e.recordId);
   const hits = e.rules.filter((r) => r.tier === 'satisfied' || r.tier === 'conflict');
@@ -1101,10 +1112,12 @@ function matchResultCard(e) {
   const unRow = (r) => `<div class="row"><div class="row-main"><div><b>${esc(r.text)}</b><p>无法自动匹配：${esc(r.mine)}</p></div><span class="pill grey">无法自动匹配</span></div></div>`;
   const fav = state.trialFavs.has(e.recordId);
   const nl = { structured: hits.filter(r => r.layer === 'structured').length, text: hits.filter(r => r.layer === 'text').length, broad: hits.filter(r => r.layer === 'broad').length };
+  const mb = matchBand(e);
   return `<div class="cand">
     <div class="cand-head"><b>${esc(item ? item.title : e.recordId)}</b>
-      <div class="head-actions"><button class="chip${fav ? ' on' : ''}" data-action="trial-fav" data-arg="${esc(e.recordId)}" aria-pressed="${fav}">☆ 收藏</button></div></div>
-    <p class="muted">命中 ${hits.length} 项（结构化 ${nl.structured} · 文本 ${nl.text} · 宽口径 ${nl.broad}，宽口径排末尾）· 无法自动匹配 ${unmatched.length} 项 · 待确认规则 ${e.pending.length} 项——只陈列证据链，不给综合分、不排序择优</p>
+      <div class="head-actions"><span class="fitbox ${mb.band[0]}"><b>${mb.pct}<small>%</small></b><span>粗筛符合度</span><em>${mb.band[1]}</em></span><button class="chip${fav ? ' on' : ''}" data-action="trial-fav" data-arg="${esc(e.recordId)}" aria-pressed="${fav}">☆ 收藏</button></div></div>
+    <div class="match-counts">${pill(`符合 ${mb.met}`, 'green')}${mb.unmet ? pill(`不符合 ${mb.unmet}`, 'grey') : ''}${mb.unknown ? pill(`无法自动匹配 ${mb.unknown}`, 'grey') : ''}${e.pending.length ? pill(`待确认规则 ${e.pending.length}`, 'grey') : ''}</div>
+    <p class="muted">分层陈列：结构化 ${nl.structured} · 文本 ${nl.text} · 宽口径 ${nl.broad}（宽口径排末尾）——每条给条件原文、你的记录与来源；不代为挑选试验</p>
     <div class="subhead">命中（分层陈列：条件原文 + 你的记录 + 来源）</div>
     ${sorted.map(hitRow).join('') || '<p class="muted small">（无命中条目）</p>'}
     <div class="subhead">无法自动匹配（本地无对应结构化字段，逐条列原因）</div>
@@ -1161,7 +1174,8 @@ function vTrialsMatch() {
   </div>
   <div class="card"><div class="card-head"><h2>匹配结果（三档 · 固定格式）</h2><span class="muted">确定性规则求值 · 排序按数据来源顺序</span></div>
     <div class="notice">每张卡按「结构化命中 / 文本命中 / 宽口径命中 / 无法自动匹配」分层陈列条件原文、你的记录与来源；不输出数值综合分、不排序择优、不写「你不适合/你能入组」。${esc(D.match.channelsNote)}</div>
-    <div class="rows">${D.match.entries.map(matchResultCard).join('')}</div>
+    <div class="rows">${D.match.entries.slice().sort((a, b) => (BAND_ORDER[matchBand(a).band[0]] ?? 9) - (BAND_ORDER[matchBand(b).band[0]] ?? 9)).map(matchResultCard).join('')}</div>
+    <p class="muted small">粗筛符合度 = 符合项 ÷ 已对照项，无法自动匹配按 0 计（只会偏低、不会偏高）；分层层内保持登记来源顺序。这不是入组资格，也不代表任何效果预期。</p>
     <p class="muted small">${esc(D.match.footerNote)}</p>
   </div>
   ${agentPane(matchPrompt())}

@@ -158,8 +158,9 @@ check('oneshow-chart', /function oneshowChart/.test(app) && /清宫/.test(app) &
 check('match-three-tiers',
   /结构化命中/.test(app) && /文本命中/.test(app) && /宽口径命中/.test(app) && /无法自动匹配/.test(app) && /待确认规则/.test(app)
   && /satisfied/.test(data) && /conflict/.test(data) && /undetermined/.test(data), {});
-check('match-summary-line', /命中 \$\{hits\.length\} 项/.test(app) && /无法自动匹配 \$\{unmatched\.length\} 项/.test(app)
-  && /只陈列证据链，不给综合分、不排序择优/.test(app), {});
+check('match-summary-line', /粗筛符合度/.test(app) && /符合 \$\{mb\.met\}/.test(app)
+  && app.includes('粗筛符合度 = 符合项 ÷ 已对照项，无法自动匹配按 0 计')
+  && app.includes('这不是入组资格，也不代表任何效果预期'), {});
 check('match-footer-sentence', app.includes('D.match.footerNote') && app.includes('登记状态，未核实')
   && app.includes('登记状态 ≠ 有效 ≠ 可入组')
   && data.includes('分层命中只陈列「条件原文 + 你的记录 + 来源」')
