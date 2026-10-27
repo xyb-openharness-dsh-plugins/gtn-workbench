@@ -1,12 +1,12 @@
 'use strict';
-/* 小葡宝 GraPal v0.9.1 — GTN 工作台开发版（一图秀 rail 多指标趋势 + 分类卡原位翻转 + 临床研究分层命中 v2）。
+/* 小葡宝 GraPal v0.9.2 — GTN 工作台开发版（一图秀 rail 多指标趋势 + 分类卡原位翻转 + 临床研究分层命中 v2）。
    视图与交互保持原型基准（test/ui-parity.test.mjs 逐函数比对，基准 prototypes/v0.5）；开发版只换数据来源：
    先向 `${API_BASE}/api/gtn/bootstrap` 要本机库数据，拿不到才回退 window.DEMO_DATA（离线演示）。
    家族约定：无判读词输出；AI 草稿不自动发送；删除=更正（版本链）；窄宽第一；
    数字输入选择：inputmode="decimal" + 自绘大按钮数字键盘组件（openKeypad），
    不用原生 number 键盘之外的浏览器spinner（视觉与家族键盘组件一致）。 */
 
-const APP_INFO = { version: '0.9.1', build: '2026-10-25' };
+const APP_INFO = { version: '0.9.2', build: '2026-10-25' };
 let D = window.DEMO_DATA;
 let DATA_SOURCE = 'pending';   // 'api' | 'demo'——横幅与设置页据此说明数据来自哪
 
