@@ -15,6 +15,10 @@ const css = read('public/style.css');
 const html = read('public/index.html');
 const data = read('public/demo-data.js');
 const doc = read('docs/INTERACTION-DESIGN.md');
+/* 36 号 v2：疾病概要三件套（数据 / 模块 / 样式）与装机层同源 */
+const primerData = read('public/primer-data.js');
+const primerJs = read('public/primer.js');
+const primerCss = read('public/primer.css');
 /* demo-data 是浏览器脚本：借 dsh/demo.js 的加载器求值，拿到结构化 DEMO_DATA 做数值断言 */
 const { loadDemoData } = await import('../dsh/demo.js');
 const DEMO = loadDemoData(join(root, 'public/demo-data.js'));
@@ -124,14 +128,23 @@ check('decimal-keypad', /inputmode="decimal"/.test(app) && /data-keypad/.test(ap
 /* ---------- demo 数据完整性（林小葡旅程） ---------- */
 const pts = (data.match(/d: '\d{4}-\d{2}-\d{2}', v:/g) || []).length;
 check('discuss-every-page', app.includes('data-action="discuss"') && app.includes('aria-label="和 AI 讨论本页内容'), {});
-check('discuss-brief-in-dialog', app.includes('data-action="discuss-brief"') && app.includes('和 AI 讨论这个概要'), {});
+check('primer-module-wired', primerJs.includes('window.DiseasePrimer') && primerCss.includes('.dp-overlay') && html.includes('primer-data.js') && html.includes('primer.js') && html.includes('primer.css'), {});
 check('discuss-carries-facts', app.includes('discussFacts()') && app.includes('本页关键信息'), {});
-check('disease-brief-entry', app.includes('data-action="disease-brief"') && /aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势"/.test(app), {});
+check('disease-brief-entry', html.includes('data-primer-open') && /aria-label="疾病概要：定义、医学资料与指南情况、治疗全景、发展趋势"/.test(html) && /data-primer-open/.test(app), {});
 const readmeMd = read('README.md');
+const primerIds = [...primerData.matchAll(/id: '([a-z]+)'/g)].map((m) => m[1]);
 check('disease-brief-four-sections',
-  ['定义', '医学资料规范和指南情况', '目前治疗全景概要', '发展趋势'].every(t => app.includes(t))
+  primerIds.join(',') === 'definition,evidence,landscape,trend'
+  && ['定义', '医学资料规范和指南情况', '目前治疗全景概要', '发展趋势'].every(t => primerData.includes(t))
   && ['定义', '规范与指南', '治疗全景', '发展趋势'].every(t => readmeMd.includes(t))
-  && readmeMd.includes('? 疾病概要'), {});
+  && readmeMd.includes('? 疾病概要'), { primerIds });
+/* 36 号 §2.6 状态卡四件：eyebrow / 锚点派生天数（不手填）/ 现状行 / 双出口按钮 */
+check('status-card-four-pieces',
+  app.includes('function statusCard()')
+  && app.includes('D+${days} 状态卡 · 距第 ${nextN} 个月随访')
+  && app.includes('Math.floor((today - anchorDate) / 86400000)')
+  && app.includes('${statusCard()}')
+  && app.includes('看随访日历（按月）→') && app.includes('疾病概要：妊娠滋养细胞肿瘤是什么？'), {});
 check('demo-journey', data.includes('林小葡') && pts >= 13 && /plateau/.test(data) && /anchor/.test(data) && /rise/.test(data), { hcgPoints: pts });
 /* ---------- v0.2.0 新增：3D 指标分类卡 ---------- */
 check('flip-3d-card-css', /transform-style:\s*preserve-3d/.test(css) && /rotateY\(180deg\)/.test(css) && /backface-visibility:\s*hidden/.test(css), {});

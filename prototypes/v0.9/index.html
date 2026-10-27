@@ -9,6 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237b5ea7'/%3E%3Ctext x='16' y='23' font-size='19' font-family='PingFang SC,Helvetica,sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3E%E8%91%A1%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="shell.css"><!-- 开发版外壳（分栏/五态/横幅），原型视觉基准仍是 style.css -->
+<link rel="stylesheet" href="primer.css"><!-- 36 号疾病概要（整页四段），样式独立于 style.css -->
 </head>
 <body>
 <a class="skip" href="#main">跳到主要内容</a>
@@ -27,6 +28,7 @@
       <div class="top-actions">
         <button class="status" id="store-status" data-action="open-store" aria-label="资料目录状态：已连接"><i></i><span>资料目录</span><b>已连接</b></button>
         <button class="status" id="agent-toggle" data-action="agent-toggle" aria-expanded="false" aria-controls="agent-dock" aria-label="AI 对话：暂不可用（点击查看原因）"><i class="grey"></i><span>AI 对话</span><b id="agent-label">暂不可用</b></button>
+        <button class="brief-btn" data-primer-open aria-label="疾病概要：定义、医学资料与指南情况、治疗全景、发展趋势" title="疾病概要：定义 · 指南 · 治疗全景 · 趋势">?</button>
         <button data-action="go-settings" aria-label="打开设置：资料目录、解析模式、临床参考数据包">⚙ 设置</button>
       </div>
     </header>
@@ -53,5 +55,7 @@
 </dialog>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="demo-data.js"></script>
+<script src="primer-data.js"></script>
 <script src="app.js"></script>
+<script src="primer.js"></script>
 </body></html>

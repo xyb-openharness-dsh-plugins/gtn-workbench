@@ -166,9 +166,9 @@ const moreMenu = (items) => `<details class="more"><summary aria-label="更多�
 
 function pageHead(view) {
   const p = PAGES.find(x => x[0] === view);
-  /* 疾病概要 ? 入口（用户 2026-10-25 指令）：看板标题行右侧，四要素精炼概要 */
+  /* 疾病概要 ? 入口（36 号 v2）：看板标题行右侧，打开整页四段概要（primer.js 接管） */
   const briefBtn = view === 'dashboard'
-    ? `<button class="brief-btn" data-action="disease-brief" aria-label="疾病概要：定义、规范与指南、治疗全景、发展趋势" title="疾病概要">?</button>` : '';
+    ? `<button class="brief-btn" data-primer-open aria-label="疾病概要：定义、医学资料与指南情况、治疗全景、发展趋势" title="疾病概要">?</button>` : '';
   /* 「和 AI 讨论」（脚手架标准）：点击拉起 AI 对话栏并携带本页关键信息进输入框（不代发，IP10 守卫同款） */
   const discussBtn = `<button class="discuss-btn" data-action="discuss" aria-label="和 AI 讨论本页内容（拉起对话栏并携带本页关键信息）">和 AI 讨论</button>`;
   return `<div class="page-head"><div><h1>${esc(p[1])}</h1><p>${esc(SUBTITLES[view])}</p></div><div class="head-actions">${briefBtn}${discussBtn}</div></div>`;
@@ -198,31 +198,40 @@ function discussFacts() {
   return byView[state.view] ?? base;
 }
 
-/* 疾病概要（来源 docs/CLINICAL-DATA.md，只做整理性概要，不构成诊断或治疗建议）。 */
-const DISEASE_BRIEF = {
-  def: '妊娠滋养细胞肿瘤（GTN）是一组源自妊娠滋养细胞的疾病，主要包括侵蚀性葡萄胎、绒毛膜癌与胎盘部位滋养细胞肿瘤等，多继发于葡萄胎妊娠，好发于育龄女性；血 hCG 是贯穿诊断、疗效与随访的核心监测指标。',
-  guides: [
-    ['NCCN Gestational Trophoblastic Neoplasia', '2.2026（当前版；3.2025 已被取代）'],
-    ['FIGO/WHO 2000 解剖学分期与预后评分', 'Ⅰ–Ⅳ 期；8 项评分各 0/1/2/4 分'],
-    ['中华医学会《妊娠滋养细胞疾病诊断与治疗指南》', '2021 年版（第四版）'],
-    ['随访与避孕口径', 'NCCN / 中国 / EOTTD 不一致——工作台内做出处切换 + 我的医嘱自录'],
-    ['hCG 检测溯源', '行业标准 YY/T 1192-2011；"WS/T 679"未核实'],
-    ['药品信息', 'NMPA 药品查询官方入口（甲氨蝶呤等具体品种逐条核实）'],
-  ],
-  treat: '以化疗为主要治疗（单药与联合方案的取舍由 FIGO 评分与主管医生决定，工作台不载剂量）；hCG 序列是疗效与随访的核心线索；hCG 达正常锚点（用户勾选口径）后进入按月随访期，含避孕方式与再生育规划。具体方案与判断以你的主诊医生为准。',
-  trend: '指南持续迭代（本病种 NCCN 已从 3.2025 更新至 2.2026）；免疫治疗等新方向仅见于研究文献线索，本工作台不载疗效信息（未核实）；随访节奏多源并存、尚未统一。',
-};
-function diseaseBriefDialog() {
-  openDialog('GTN 疾病概要', `
-    <div class="brief-sec"><h3>定义</h3><p>${esc(DISEASE_BRIEF.def)}</p></div>
-    <div class="brief-sec"><h3>医学资料规范和指南情况</h3>
-      <table class="brief-table"><thead><tr><th>来源</th><th>版本 / 口径</th></tr></thead><tbody>
-      ${DISEASE_BRIEF.guides.map(g => `<tr><td>${esc(g[0])}</td><td>${esc(g[1])}</td></tr>`).join('')}
-      </tbody></table></div>
-    <div class="brief-sec"><h3>目前治疗全景概要</h3><p>${esc(DISEASE_BRIEF.treat)}</p></div>
-    <div class="brief-sec"><h3>发展趋势</h3><p>${esc(DISEASE_BRIEF.trend)}</p></div>
-    <p class="muted">以上为公开资料的整理性概要，不构成诊断或治疗建议；版本与出处详见设置页与 docs/CLINICAL-DATA.md。</p>`,
-    '<button class="soft" data-action="close">关闭</button><button data-action="discuss-brief">和 AI 讨论这个概要</button>');
+/* 看板首卡 · 病程状态卡（36 号 §2.6 四件）：卡头 eyebrow / 锚点派生大字天数 / 现状行 / 出口按钮排。
+   天数一律由锚点日与今天的差值计算，不手填；无锚点显示「待初始化」并指向设置三步向导。 */
+function statusCard() {
+  const anchor = D.followup && D.followup.anchor;
+  const anchorDate = anchor ? new Date(`${anchor}T00:00:00`) : null;
+  const valid = !!(anchorDate && !Number.isNaN(anchorDate.getTime()));
+  const latest = D.followup.months.reduce((a, b) => (b.n > a.n ? b : a), D.followup.months[0]);
+  const nextN = latest.n + 1;
+  const fmtDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  let nextDue = '';
+  if (valid) {
+    const nd = new Date(anchorDate.getTime());
+    nd.setMonth(nd.getMonth() + nextN);
+    nextDue = fmtDate(nd);
+  }
+  const days = valid ? Math.max(0, Math.floor((today - anchorDate) / 86400000)) : null;
+  const eyebrow = valid ? `D+${days} 状态卡 · 距第 ${nextN} 个月随访` : 'D+N 状态卡 · 待初始化';
+  const big = valid
+    ? `<b style="font-size:28px;line-height:1.25;color:var(--accent)">第 ${days} 天</b><p>自 ${esc(anchor)} 起算 · ${esc(D.followup.anchorLabel)}</p>`
+    : `<b style="font-size:28px;line-height:1.25;color:var(--accent)">待初始化</b><p>还没有锚点日，天数不手填。</p>`;
+  const statusLine = valid
+    ? `${esc(D.followup.anchorLabel)} · 随访已记到第 ${latest.n} 个月 · 下次：${nextDue}（第 ${nextN} 个月随访 hCG）`
+    : '先完成三步初始化：① 录末次妊娠与 FIGO 评分 ② 录血 hCG 序列并勾选达正常锚点 ③ 设随访节奏出处。';
+  const primary = valid
+    ? `<button data-action="go" data-arg="followup">看随访日历（按月）→</button>`
+    : `<button data-action="go" data-arg="settings">去设置（三步向导）→</button>`;
+  return `<div class="card accent status-card">
+    <div class="card-head"><span class="eyebrow">${eyebrow}</span><span class="muted">按锚点日派生</span></div>
+    <div class="rows">
+      <div class="row"><div class="row-main"><div>${big}</div></div></div>
+      <div class="row"><div class="row-main"><div><b>当前阶段</b><p>${statusLine}</p></div></div></div>
+    </div>
+    <div class="actions">${primary}<button class="soft" data-primer-open aria-label="疾病概要：定义、医学资料与指南情况、治疗全景、发展趋势">疾病概要：妊娠滋养细胞肿瘤是什么？</button></div>
+  </div>`;
 }
 
 /* AI 协助条：每个一级页至少一处 gtn:agent-draft 按钮。 */
@@ -408,6 +417,7 @@ function vDashboard() {
     <p>数值只陈述记录，不给判定；怎么解读问你的主诊医生。</p>
   </div></section>
 
+  ${statusCard()}
   ${metricCatGrid()}
   <div class="dash-grid">
     <div class="col">
@@ -1577,19 +1587,12 @@ const actions = {
   key(el) { keypadKey(el.dataset.k); },
   'key-ok'() { if (state.keypad && state.keypad.input) state.keypad.input.value = $('#keypad-screen').value; closeDialog(); },
   close() { closeDialog(); },
-  'disease-brief'() { diseaseBriefDialog(); },
   /* 「和 AI 讨论」：拉起对话栏 + 携带本页关键信息（填入不代发）；再次点击对话栏不收起（收起走顶栏五态开关） */
   discuss() {
     const draftBtn = document.querySelector('.agent-card [data-action="agent-draft"]');
     const base = draftBtn ? draftBtn.dataset.prompt : '请帮我整理当前页面的记录。';
     const title = (PAGES.find(x => x[0] === state.view) || [])[1] ?? '';
     agentDraft(`【${title} · 本页关键信息】${discussFacts()}\n\n${base}`);
-    agentPaneApply('open');
-    document.querySelector('#agent-dock')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  },
-  'discuss-brief'() {
-    closeDialog();
-    agentDraft(`【GTN 疾病概要 · 讨论】我正在看疾病概要：指南以 NCCN 2.2026 / FIGO 2000 评分 / 中华医学会 2021 为出处。请用通俗的话解释其中我不懂的部分（比如 FIGO 评分八个项目分别是什么意思），只做概念解释，不针对我的病情做任何判断。`);
     agentPaneApply('open');
     document.querySelector('#agent-dock')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
