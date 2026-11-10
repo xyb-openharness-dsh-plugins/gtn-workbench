@@ -1,6 +1,6 @@
 {
   "name": "@xyb-community/gtn-workbench",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "本机优先的GTN患者工作台：hCG血清序列时间线、化疗疗程折叠卡档案、末次妊娠与FIGO评分整理、治愈后随访日历与营养心理记录、临床研究登记摘录（0访谈如实声明，不做诊断与治疗建议）",
   "private": true,
   "type": "module",
@@ -34,7 +34,7 @@
     "check:prototype": "node scripts/check-prototype.mjs",
     "check:host": "node scripts/check-host-contract.mjs",
     "check:install": "node scripts/check-install.mjs",
-    "check": "node scripts/build-version.mjs && node scripts/check-version.mjs && node scripts/check-syntax.mjs && node scripts/check-schema.mjs && node scripts/check-wording.mjs && node --disable-warning=ExperimentalWarning scripts/check-demo-columns.mjs && node scripts/build-client.mjs --check && node scripts/check-host-contract.mjs && node --disable-warning=ExperimentalWarning --test test/*.test.mjs && node scripts/check-trial-matching.mjs . && node scripts/check-workbench-package.mjs . && node scripts/check-prototype.mjs && node scripts/check-primer-links.mjs && node scripts/check-primer-links.mjs --data public/primer-data.js",
+    "check": "node scripts/build-version.mjs && node scripts/check-version.mjs && node scripts/check-syntax.mjs && node scripts/check-schema.mjs && node scripts/check-wording.mjs && node --disable-warning=ExperimentalWarning scripts/check-demo-columns.mjs && node scripts/build-client.mjs --check && node scripts/check-host-contract.mjs && node --disable-warning=ExperimentalWarning --test test/*.test.mjs && node scripts/check-trial-matching.mjs . && node scripts/check-workbench-package.mjs . && node scripts/check-prototype.mjs && node scripts/check-primer-links.mjs && node scripts/check-primer-links.mjs --data public/primer-data.js && node scripts/check-agent-pane-contract.mjs .",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs",
     "audit": "node scripts/check-conformance.mjs .",
     "start": "node --disable-warning=ExperimentalWarning scripts/dev-server.mjs",
